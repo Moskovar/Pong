@@ -133,10 +133,10 @@ void receive_data_tcp()
     {
         if (co.recvTCP(nball, run))
         {
-            mtx.lock();
+            //mtx.lock();
             if (ball) ball->update(nball);
             else std::cout << "BALL nullptr" << std::endl;
-            mtx.unlock();
+            //mtx.unlock();
         }
     }
 }
@@ -145,16 +145,12 @@ int main()
 {
 	std::cout << "Hello Pong !" << std::endl;
 
-    //co.setWaitingModeTCP(true);
-
     bool runt = true;
     NetworkPaddleStart nps1, nps2;
     co.recvNPSTCP(nps1, runt);
     //std::cout << "HEADER: " << nps1.header << " : " << nps1.id << " : " << nps1.side << std::endl;
     co.recvNPSTCP(nps2, runt);
     //std::cout << "HEADER: " << nps2.header << " : " << nps2.id << " : " << nps2.side << std::endl;
-
-    //co.setWaitingModeTCP(false);
 
     //--- Chargement du contexte OpenGL ---//
     window = new Window(width, height);
@@ -186,27 +182,42 @@ int main()
     float   currentFrame    = 0, animationTime = 0, timeSinceStart = 0,
             lastFrame       = glfwGetTime(), deltaTime = 0, now = 0;
 
-    players.push_back(new Player(nps1.gameID, nps1.id, nps1.side));
-    players.push_back(new Player(nps2.gameID, nps2.id, nps2.side));
-
-    ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f)  , "models/fbx/ball.fbx");
-
     std::vector<Element> walls;
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f,  40.0f), "models/fbx/wall.fbx"));
 
     physicsEngine = new PhysicsEngine(&players, &walls, ball);
 
-    std::thread t_receive_data_udp(receive_data_udp);
-    //std::thread t_receive_data_tcp(receive_data_tcp);
-
-    std::cout << "MAXPOINT: " << ball->getRHitbox().maxPoint.x << " : " << ball->getRHitbox().maxPoint.y << " : " << ball->getRHitbox().maxPoint.z << std::endl;
+    //std::cout << "MAXPOINT: " << ball->getRHitbox().maxPoint.x << " : " << ball->getRHitbox().maxPoint.y << " : " << ball->getRHitbox().maxPoint.z << std::endl;
 
     std::cout << "MINPOINT: " << walls[0].getRHitbox().minPoint.x << " : " << walls[0].getRHitbox().minPoint.y << " : " << walls[0].getRHitbox().minPoint.z << std::endl;
     std::cout << "MAXPOINT: " << walls[0].getRHitbox().maxPoint.x << " : " << walls[0].getRHitbox().maxPoint.y << " : " << walls[0].getRHitbox().maxPoint.z << std::endl;
     std::cout << "MINPOINT: " << walls[1].getRHitbox().minPoint.x << " : " << walls[1].getRHitbox().minPoint.y << " : " << walls[1].getRHitbox().minPoint.z << std::endl;
     std::cout << "MAXPOINT: " << walls[1].getRHitbox().maxPoint.x << " : " << walls[1].getRHitbox().maxPoint.y << " : " << walls[1].getRHitbox().maxPoint.z << std::endl;
     //std::cout << "MAXPOINT: " << ball->getRHitbox().maxPoint.x << " : " << ball->getRHitbox().maxPoint.y << " : " << ball->getRHitbox().maxPoint.z << std::endl;
+
+    players.push_back(new Player(nps1.gameID, nps1.id, nps1.side));
+    players.push_back(new Player(nps2.gameID, nps2.id, nps2.side));
+
+    ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
+
+    NetworkBall nb;
+
+    if (co.recvTCP(nb, run))
+    {
+        //mtx.lock();
+        if (ball) ball->update(nb);
+        else std::cout << "BALL nullptr" << std::endl;
+        //mtx.unlock();
+    }
+    else
+    {
+        std::cout << "NO BALL DATA RECEIVED, EXIT" << std::endl;
+        run = false;
+    }
+
+    std::thread t_receive_data_udp(receive_data_udp);
+    std::thread t_receive_data_tcp(receive_data_tcp);
 
     while (!glfwWindowShouldClose(glfwWindow) && run)
     {
@@ -263,7 +274,7 @@ int main()
     run = false;
 
     t_receive_data_udp.join();
-    //t_receive_data_tcp.join();
+    t_receive_data_tcp.join();
 
     // Nettoyer et quitter
     if (physicsEngine)

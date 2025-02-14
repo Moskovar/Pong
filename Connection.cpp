@@ -227,6 +227,7 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
         nball.z         = ntohl(nball.z);
         nball.velocityX = ntohl(nball.velocityX);
         nball.velocityZ = ntohl(nball.velocityZ);
+        nball.timestamp = ntohl(nball.timestamp);
 
         std::cout << "BALL POS: " << nball.x << " : " << nball.z << " : " << nball.velocityX << " : " << nball.velocityZ << std::endl;
     }

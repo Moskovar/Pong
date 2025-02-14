@@ -22,7 +22,7 @@ class Ball : public Element
 
 	private:
 		short direction = 1.0f;//1 ou - 1 pour donner la direction
-		GLfloat velocityX = 1.0f, velocityZ = 0.0f;
+		GLfloat velocityX = 0.0f, velocityZ = 0.0f;
 
 		uint64_t lastTimeDirectionChanged = 0;
 };

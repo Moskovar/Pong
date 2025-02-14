@@ -2,32 +2,24 @@
 
 Ball::Ball(short id, glm::vec3 position, const std::string& filePath) : Element(id, position, filePath)
 {
-	this->moveSpeed = 25.0f;
-
-	lastTimeDirectionChanged = getCurrentTimestampMilliseconds();
-
-	//turn(90);
+	this->moveSpeed = 50.0f;
 }
 
 void Ball::move(GLfloat deltaTime)
 {
 	//translate(glm::vec3(direction * moveSpeed * deltaTime * velocityX, 0.0f, direction * moveSpeed * deltaTime * velocityZ));
 	//updatePosition();
+	std::cout << "VelocityX: " << velocityX << std::endl;
 
-	position.x += direction * moveSpeed * deltaTime * velocityX;
-	position.z += direction * moveSpeed * deltaTime * velocityZ;
+	position.x += moveSpeed * deltaTime * velocityX;
+	position.z += moveSpeed * deltaTime * velocityZ;
 
 	updateModelMatrixFromPosition();
 }
 
-void Ball::turnBack()
+void Ball::turnBack()//useless?
 {
-	//if ((getCurrentTimestampMilliseconds() - lastTimeDirectionChanged) <= 500) return;
-
-	//turn(180);
 	direction *= -1.0f;
-
-	lastTimeDirectionChanged = getCurrentTimestampMilliseconds();
 }
 
 void Ball::update(NetworkBall& nball)

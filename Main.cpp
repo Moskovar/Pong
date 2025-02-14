@@ -201,20 +201,20 @@ int main()
 
     ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
 
-    NetworkBall nb;
+    //NetworkBall nb;
 
-    if (co.recvTCP(nb, run))
-    {
-        //mtx.lock();
-        if (ball) ball->update(nb);
-        else std::cout << "BALL nullptr" << std::endl;
-        //mtx.unlock();
-    }
-    else
-    {
-        std::cout << "NO BALL DATA RECEIVED, EXIT" << std::endl;
-        run = false;
-    }
+    //if (co.recvTCP(nb, run))
+    //{
+    //    //mtx.lock();
+    //    if (ball) ball->update(nb);
+    //    else std::cout << "BALL nullptr" << std::endl;
+    //    //mtx.unlock();
+    //}
+    //else
+    //{
+    //    std::cout << "NO BALL DATA RECEIVED, EXIT" << std::endl;
+    //    run = false;
+    //}
 
     std::thread t_receive_data_udp(receive_data_udp);
     std::thread t_receive_data_tcp(receive_data_tcp);
@@ -232,7 +232,7 @@ int main()
         glm::vec3 worldPos;
         findRayIntersectionWithMap(camera->getPosition(), generateRayFromCursor(glfwWindow), worldPos);
 
-        std::cout << "worldPos: " << worldPos.x << " : " << worldPos.y << " : " << worldPos.z << std::endl;
+        //std::cout << "worldPos: " << worldPos.x << " : " << worldPos.y << " : " << worldPos.z << std::endl;
 
         //if (players[0]->getNP().id == 0) std::cout << worldPos.z << std::endl;
 
@@ -248,6 +248,13 @@ int main()
                 co.sendNPUDP(np);
             }
         }
+        glm::vec3 maxp = walls[0].getMaxPoint(), minp = walls[0].getMinPoint();
+        glm::vec3 maxp2 = walls[0].getModel()->getMaxPoint(), minp2 = walls[0].getModel()->getMinPoint();
+
+        std::cout << maxp.x << " : " << maxp.y << " : " << maxp.z << std::endl;
+        std::cout << minp.x << " : " << minp.y << " : " << minp.z << std::endl;
+        std::cout << maxp2.x << " : " << maxp2.y << " : " << maxp2.z << std::endl;
+        std::cout << minp2.x << " : " << minp2.y << " : " << minp2.z << std::endl;
 
         // Effacer le buffer de couleur et de profondeur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

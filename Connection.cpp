@@ -19,7 +19,7 @@ Connection::Connection()//gérer les erreurs avec des exceptions
 
     //--- Définition de l'adresse du serveur TCP ---//
     tcpServerAddr.sin_family = AF_INET;
-    tcpServerAddr.sin_port = htons(35500);
+    tcpServerAddr.sin_port = htons(50000);
     inet_pton(AF_INET, ADDR, &tcpServerAddr.sin_addr);
 
     //--- Connexion au serveur TCP ---//
@@ -44,8 +44,8 @@ Connection::Connection()//gérer les erreurs avec des exceptions
 
     //--- Définition de l'adresse du serveur UDP ---//
     udpServerAddr.sin_family = AF_INET;
-    udpServerAddr.sin_port = htons(8080);
-    inet_pton(AF_INET, "127.0.0.1", &udpServerAddr.sin_addr);
+    udpServerAddr.sin_port = htons(50001);
+    inet_pton(AF_INET, ADDR, &udpServerAddr.sin_addr);
 
     //--- Socket TCP et UDP mit en mode non bloquant ---//
     u_long modeTCP = 1;

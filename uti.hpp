@@ -1,7 +1,6 @@
 #pragma once
 #include <GL/glew.h>
 #include <GLM/glm.hpp>
-
 #include <map>
 #include <string>
 #include <array>
@@ -90,6 +89,8 @@ struct OBB
 		//std::cout << "mp: " << minPoint.x << " : " << minPoint.y << " : " << minPoint.z << std::endl;
 	}
 };
+
+bool isPointInOBB(const glm::vec3& point, const OBB& obb);
 
 struct HeightMapVertex
 {

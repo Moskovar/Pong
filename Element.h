@@ -32,6 +32,7 @@ public:
 	glm::mat4	getAnticipatedMove(GLfloat deltaTime);
 	glm::mat4   getAnticipatedFall(GLfloat deltaTime);
 	OBB		getAnticipatedMoveHitbox(GLfloat deltaTime);
+	OBB getOBBAtPos(glm::vec3 pos);
 	OBB		getAnticipatedFallHitbox(GLfloat deltaTime);
 
 

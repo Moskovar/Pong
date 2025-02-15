@@ -112,6 +112,33 @@ OBB Element::getAnticipatedMoveHitbox(GLfloat deltaTime)//duplication code avec 
 	return anticipatedHitbox;
 }
 
+OBB Element::getOBBAtPos(glm::vec3 pos)//duplication code avec fall
+{
+	glm::mat4 anticipatedMtx = modelMatrix;
+	anticipatedMtx[3].x = pos.x;
+	anticipatedMtx[3].y = pos.y;
+	anticipatedMtx[3].z = pos.z;
+
+	OBB anticipatedHitbox;
+	anticipatedHitbox.center = glm::vec3(anticipatedMtx[3].x, anticipatedMtx[3].y, anticipatedMtx[3].z);
+
+	// Assurer que l'orientation est correcte
+	anticipatedHitbox.orientation = glm::mat3(anticipatedMtx);
+
+	glm::vec3 scale = glm::vec3(
+		glm::length(this->modelMatrix[0]),
+		glm::length(this->modelMatrix[1]),
+		glm::length(this->modelMatrix[2])
+	);
+
+	// Recalculer halfSize en tenant compte des transformations
+	anticipatedHitbox.halfSize = (model->getMaxPoint() - model->getMinPoint()) * 0.5f * scale;
+
+	anticipatedHitbox.updateBounds();
+
+	return anticipatedHitbox;
+}
+
 OBB Element::getAnticipatedFallHitbox(GLfloat deltaTime)//duplication code avec getAntiMoveBoxe
 {
 	glm::mat4 anticipatedMtx = glm::translate(modelMatrix, glm::vec3(0.0f, -FALL_SPEED * deltaTime, 0.0f));

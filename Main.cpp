@@ -89,6 +89,112 @@ glm::vec3 generateRayFromCursor(GLFWwindow* window)
     return rayDirection;
 }
 
+float distanceBetweenHitboxes(Element* e1, Element* e2)
+{
+    float distanceX = 0.0f;
+    float distanceY = 0.0f;
+    float distanceZ = 0.0f;
+
+    if (!e1 || !e2) std::cout << "E1 OR E2 NULLPTR !!!!" << std::endl;
+
+    glm::vec3 e1_maxPoint = e1->getRHitbox().maxPoint;
+    glm::vec3 e1_minPoint = e1->getRHitbox().minPoint;
+    glm::vec3 e2_maxPoint = e2->getRHitbox().maxPoint;
+    glm::vec3 e2_minPoint = e2->getRHitbox().minPoint;
+
+    // Axe X
+    if (e1_maxPoint.x < e2_minPoint.x)
+    {
+        distanceX = e2_minPoint.x - e1_maxPoint.x;  // À gauche
+    }
+    else if (e1_minPoint.x > e2_maxPoint.x)
+    {
+        distanceX = e1_minPoint.x - e2_maxPoint.x;  // À droite
+    }
+
+    // Axe Y
+    if (e1_maxPoint.y < e2_minPoint.y)
+    {
+        distanceY = e2_minPoint.y - e1_maxPoint.y;  // En-dessous
+    }
+    else if (e1_minPoint.y > e2_maxPoint.y)
+    {
+        distanceY = e1_minPoint.y - e2_maxPoint.y;  // Au-dessus
+    }
+
+    // Axe Z
+    if (e1_maxPoint.z < e2_minPoint.z)
+    {
+        distanceZ = e2_minPoint.z - e1_maxPoint.z;  // Derrière
+    }
+    else if (e1_minPoint.z > e2_maxPoint.z)
+    {
+        distanceZ = e1_minPoint.z - e2_maxPoint.z;  // Devant
+    }
+
+    // Si les hitboxes se chevauchent, retourner 0
+    if (distanceX <= 0.0f && distanceY <= 0.0f && distanceZ <= 0.0f)
+    {
+        return 0.0f;  // Collision
+    }
+
+    // Calculer la distance totale entre les deux hitboxes en 3D
+    return glm::sqrt(distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ);
+}
+
+float distanceBetweenHitboxes(OBB& obb1, OBB& obb2)
+{
+    float distanceX = 0.0f;
+    float distanceY = 0.0f;
+    float distanceZ = 0.0f;
+
+    //if (!e1 || !e2) std::cout << "E1 OR E2 NULLPTR !!!!" << std::endl;
+
+    glm::vec3 e1_maxPoint = obb1.maxPoint;
+    glm::vec3 e1_minPoint = obb1.minPoint;
+    glm::vec3 e2_maxPoint = obb2.maxPoint;
+    glm::vec3 e2_minPoint = obb2.minPoint;
+
+    // Axe X
+    if (e1_maxPoint.x < e2_minPoint.x)
+    {
+        distanceX = e2_minPoint.x - e1_maxPoint.x;  // À gauche
+    }
+    else if (e1_minPoint.x > e2_maxPoint.x)
+    {
+        distanceX = e1_minPoint.x - e2_maxPoint.x;  // À droite
+    }
+
+    // Axe Y
+    if (e1_maxPoint.y < e2_minPoint.y)
+    {
+        distanceY = e2_minPoint.y - e1_maxPoint.y;  // En-dessous
+    }
+    else if (e1_minPoint.y > e2_maxPoint.y)
+    {
+        distanceY = e1_minPoint.y - e2_maxPoint.y;  // Au-dessus
+    }
+
+    // Axe Z
+    if (e1_maxPoint.z < e2_minPoint.z)
+    {
+        distanceZ = e2_minPoint.z - e1_maxPoint.z;  // Derrière
+    }
+    else if (e1_minPoint.z > e2_maxPoint.z)
+    {
+        distanceZ = e1_minPoint.z - e2_maxPoint.z;  // Devant
+    }
+
+    // Si les hitboxes se chevauchent, retourner 0
+    if (distanceX <= 0.0f && distanceY <= 0.0f && distanceZ <= 0.0f)
+    {
+        return 0.0f;  // Collision
+    }
+
+    // Calculer la distance totale entre les deux hitboxes en 3D
+    return glm::sqrt(distanceX * distanceX + distanceY * distanceY + distanceZ * distanceZ);
+}
+
 bool findRayIntersectionWithMap(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::vec3& worldPos) {
     // Vérifie que le rayon n'est pas parallèle au plan
     const float epsilon = 0.0001f;
@@ -236,25 +342,49 @@ int main()
 
         //if (players[0]->getNP().id == 0) std::cout << worldPos.z << std::endl;
 
+        std::cout << "IS WORLPOS IN OBB: " << isPointInOBB(worldPos, walls[0].getRHitbox()) << std::endl;;
+
+
         if (players[0])
         {
-            GLfloat z = players[0]->getPaddle()->getPosition().z;
-            players[0]->getPaddle()->setPositionZ(worldPos.z);
-            if (players[0]->getPaddle()->getPosition().z != z)
+            glm::vec3 wpos = players[0]->getPaddle()->getPosition();
+            wpos.z = worldPos.z;
+
+            OBB obb2 = players[0]->getPaddle()->getOBBAtPos(wpos);
+
+            bool collision = false;
+            for (Element& wall : walls)
             {
-                //std::cout << "pos changed, send udp..." << std::endl;
-                NetworkPaddle np = players[0]->getNP();
-                //std::cout << players[0]->getPaddle()->getPosition().z << " : " << np.z << std::endl;
-                co.sendNPUDP(np);
+                if (distanceBetweenHitboxes(obb2, wall.getRHitbox()) == 0)
+                {
+                    collision = false;
+                    OBB wallOBB = wall.getRHitbox();
+                    worldPos.z = (worldPos.z > 0) ? wallOBB.center.z - wallOBB.halfSize.z - players[0]->getPaddle()->getWidth() / 2.0f //pour les obstacles > 0
+                                                  : wallOBB.center.z + wallOBB.halfSize.z + players[0]->getPaddle()->getWidth() / 2.0f;//pour les obstacles < 0 
+                    break;
+                }
             }
+
+            if (!collision)
+            {
+                GLfloat z = players[0]->getPaddle()->getPosition().z;
+                players[0]->getPaddle()->setPositionZ(worldPos.z);
+                if (players[0]->getPaddle()->getPosition().z != z)//si le paddle a changé de position
+                {
+                    //std::cout << "pos changed, send udp..." << std::endl;
+                    NetworkPaddle np = players[0]->getNP();
+                    //std::cout << players[0]->getPaddle()->getPosition().z << " : " << np.z << std::endl;
+                    co.sendNPUDP(np);
+                }
+            }            
         }
         glm::vec3 maxp = walls[0].getMaxPoint(), minp = walls[0].getMinPoint();
         glm::vec3 maxp2 = walls[0].getModel()->getMaxPoint(), minp2 = walls[0].getModel()->getMinPoint();
 
-        std::cout << maxp.x << " : " << maxp.y << " : " << maxp.z << std::endl;
-        std::cout << minp.x << " : " << minp.y << " : " << minp.z << std::endl;
-        std::cout << maxp2.x << " : " << maxp2.y << " : " << maxp2.z << std::endl;
-        std::cout << minp2.x << " : " << minp2.y << " : " << minp2.z << std::endl;
+        //std::cout << maxp.x << " : " << maxp.y << " : " << maxp.z << std::endl;
+        //std::cout << minp.x << " : " << minp.y << " : " << minp.z << std::endl;
+        //std::cout << maxp2.x << " : " << maxp2.y << " : " << maxp2.z << std::endl;
+        //std::cout << minp2.x << " : " << minp2.y << " : " << minp2.z << std::endl;
 
         // Effacer le buffer de couleur et de profondeur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

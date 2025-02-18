@@ -2,7 +2,7 @@
 
 Ball::Ball(short id, glm::vec3 position, const std::string& filePath) : Element(id, position, filePath)
 {
-	this->moveSpeed = 100.0f;
+	//this->moveSpeed = 50.0f;
 }
 
 void Ball::setLastElementHit(Element* e)

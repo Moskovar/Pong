@@ -30,6 +30,7 @@ public:
 	bool		isFalling()			{ return falling;			}
 	glm::mat4	getModelMtx()		{ return modelMatrix;		}
 	uint8_t		getDirectionValue() { return movingValue;		}
+	GLfloat		getMoveSpeed()		{ return moveSpeed;			}
 
 	glm::mat4	getAnticipatedMove(GLfloat deltaTime);
 	glm::mat4   getAnticipatedFall(GLfloat deltaTime);

@@ -243,10 +243,14 @@ void receive_data_udp()
 void receive_data_tcp()
 {
     NetworkBall nball;
+    NetworkBallSpeed nbs;
+
+    short header = 0;
 
     while (run)
     {
-        if (co.recvTCP(nball, run))
+        header = co.recvTCP(nball, nbs, run);
+        if(header == Header::BALL)
         {
             //mtx.lock();
             if (ball)
@@ -257,6 +261,11 @@ void receive_data_tcp()
             }
             else std::cout << "BALL nullptr" << std::endl;
             //mtx.unlock();
+        }
+        else if (header == Header::BALLSPEED)
+        {
+            ball->setMoveSpeed(nbs.speed);
+            std::cout << "BALL SPEED IS NOW AT: " << ball->getMoveSpeed() << std::endl;
         }
     }
 }

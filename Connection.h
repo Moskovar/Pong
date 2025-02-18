@@ -14,7 +14,7 @@ class Connection
 		Connection();
 		~Connection();
 
-		bool recvTCP(NetworkBall& nball, GLboolean& run);
+		short recvTCP(NetworkBall& nball, NetworkBallSpeed& nbs, GLboolean& run);
 		bool recvVersionTCP(NetworkVersion& nv);
 		bool recvNPSTCP(NetworkPaddleStart& nps, bool& run);
 

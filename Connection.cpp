@@ -79,13 +79,13 @@ Connection::~Connection()
 //    }
 //}
 
-bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
+short Connection::recvTCP(NetworkBall& nball, NetworkBallSpeed& nbs, GLboolean& run)
 {
     int bytesReceived = 0;
     int totalReceived = 0;
     char buffer[512];
 
-    short header = 0;
+    short header = -1;
 
     // Réception du header
     while (totalReceived < sizeof(header))
@@ -101,7 +101,7 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
                 continue;
             }
             std::cerr << "Error receiving header: " << wsaError << std::endl;
-            return false;
+            return -1;
         }
         totalReceived += bytesReceived;
     }
@@ -120,11 +120,16 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
         //std::cout << "Header " << header << " received" << std::endl;
         dataSize = sizeof(NetworkBall);
     }
+    else if (header == Header::BALLSPEED)
+    {
+        //std::cout << "Header " << header << " received" << std::endl;
+        dataSize = sizeof(NetworkBallSpeed);
+    }
     else
     {
         std::cout << "Wrong TCP message, NBALL was expected: " << header << " has been received..." << std::endl;
 
-        return false;
+        return -1;
     }
 
     // Réception des données restantes
@@ -143,7 +148,7 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
                 continue;
             }
             std::cerr << "Error receiving message: " << wsaError << std::endl;
-            return false;
+            return -1;
         }
         totalReceived += bytesReceived;
         //std::cout << totalReceived << std::endl;
@@ -163,8 +168,18 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
 
         std::cout << "TCP BALL: " << (float)(nball.x / 1000.0f) << " : " << (float)(nball.z / 1000.0f) << " : " << (float)(nball.velocityX / 1000.0f) << " : " << (float)(nball.velocityZ / 1000.0f) << std::endl;
     }
+    else if (header == Header::BALLSPEED)
+    {
+        // Copier les données reçues (y compris le header) dans la structure NetworkEntity
+        std::memcpy(&nbs, buffer, dataSize);
 
-    return true;
+        // Convertir les champs en endian correct si nécessaire
+        nbs.speed = ntohs(nbs.speed);
+
+        std::cout << "TCP BALLSPEED: " << nbs.speed << std::endl;
+    }
+
+    return header;
 }
 
 bool Connection::recvVersionTCP(NetworkVersion& nv)

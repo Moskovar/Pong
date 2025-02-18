@@ -62,74 +62,6 @@ Connection::~Connection()
     WSACleanup();
 }
 
-void Connection::sendNETCP(NetworkEntity ne)
-{
-    if (tcpSocket == INVALID_SOCKET) {
-        std::cerr << "Invalid TCP socket." << std::endl;
-        return;
-    }
-    ne.header    = htons(ne.header);
-    ne.id        = htons(ne.id);
-    ne.countDir  = htons(ne.countDir);
-    ne.hp        = htons(ne.hp);
-    ne.xMap      = htonl(ne.xMap);
-    ne.yMap      = htonl(ne.yMap);
-    ne.timestamp = htonll(ne.timestamp);
-    int iResult = ::send(tcpSocket, (const char*)&ne, sizeof(ne), 0);
-    if (iResult == SOCKET_ERROR) {
-        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
-    }
-    //std::cout << "Bytes Sent: " << iResult << std::endl;
-}
-
-void Connection::sendNESTCP(NetworkEntitySpell nes)
-{
-    if (tcpSocket == INVALID_SOCKET) {
-        std::cerr << "Invalid TCP socket." << std::endl;
-        return;
-    }
-    nes.header = htons(nes.header);
-    nes.id     = htons(nes.id);
-    nes.spellID = htons(nes.spellID);
-    int iResult = ::send(tcpSocket, (const char*)&nes, sizeof(nes), 0);
-    if (iResult == SOCKET_ERROR) {
-        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
-    }
-    //std::cout << "Bytes Sent: " << iResult << std::endl;
-}
-
-void Connection::sendNESETCP(NetworkEntitySpellEffect nese)
-{
-    if (tcpSocket == INVALID_SOCKET) {
-        std::cerr << "Invalid TCP socket." << std::endl;
-        return;
-    }
-    nese.header  = htons(nese.header);
-    nese.id      = htons(nese.id);
-    nese.spellID = htons(nese.spellID);
-
-    int iResult = ::send(tcpSocket, (const char*)&nese, sizeof(nese), 0);
-    if (iResult == SOCKET_ERROR) {
-        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
-    }
-}
-
-void Connection::sendNETTCP(NetworkEntityTarget net)
-{
-    if (tcpSocket == INVALID_SOCKET) {
-        std::cerr << "Invalid TCP socket." << std::endl;
-        return;
-    }
-    net.header   = htons(net.header);
-    net.id       = htons(net.id);
-    net.targetID = htons(net.targetID);
-
-    int iResult = ::send(tcpSocket, (const char*)&net, sizeof(net), 0);
-    if (iResult == SOCKET_ERROR) {
-        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
-    }
-}
-
 //void Connection::sendNEUDP(NetworkEntity& ne)
 //{
 //    ne.id = htons(ne.id);
@@ -183,7 +115,7 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
 
     // Définir la taille des données en fonction du header
     unsigned long dataSize = 0;
-    if (header == 7)
+    if (header == Header::BALL)
     {
         //std::cout << "Header " << header << " received" << std::endl;
         dataSize = sizeof(NetworkBall);
@@ -229,7 +161,89 @@ bool Connection::recvTCP(NetworkBall& nball, GLboolean& run)
         nball.velocityZ = ntohl(nball.velocityZ);
         nball.timestamp = ntohl(nball.timestamp);
 
-        std::cout << "BALL POS: " << nball.x << " : " << nball.z << " : " << nball.velocityX << " : " << nball.velocityZ << std::endl;
+        std::cout << "TCP BALL: " << (float)(nball.x / 1000.0f) << " : " << (float)(nball.z / 1000.0f) << " : " << (float)(nball.velocityX / 1000.0f) << " : " << (float)(nball.velocityZ / 1000.0f) << std::endl;
+    }
+
+    return true;
+}
+
+bool Connection::recvVersionTCP(NetworkVersion& nv)
+{
+    int bytesReceived = 0;
+    int totalReceived = 0;
+    char buffer[512];
+
+    short header = 0;
+
+    // Réception du header
+    while (totalReceived < sizeof(header))
+    {
+        //std::cout << "Reception du header..." << std::endl;
+        bytesReceived = recv(tcpSocket, ((char*)&header) + totalReceived, sizeof(header) - totalReceived, 0);
+        if (bytesReceived <= 0) {
+            int wsaError = WSAGetLastError();
+            if (wsaError == 10035)
+            { // socket en mode non bloquant n'a rien reçu
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+            std::cerr << "Error receiving header: " << wsaError << std::endl;
+            return false;
+        }
+        totalReceived += bytesReceived;
+    }
+
+    // Convertir le header
+    header = ntohs(header);
+    //std::cout << "Header: " << header << std::endl;
+
+    // Copier le header dans le buffer
+    std::memcpy(buffer, &header, sizeof(header));
+
+    // Définir la taille des données en fonction du header
+    unsigned long dataSize = 0;
+    if (header == Header::VERSION)
+    {
+        //std::cout << "Header " << header << " received" << std::endl;
+        dataSize = sizeof(NetworkVersion);
+    }
+    else
+    {
+        std::cout << "Wrong TCP message, NPS was expected: " << header << " has been received..." << std::endl;
+
+        return false;
+    }
+
+    // Réception des données restantes
+    totalReceived = sizeof(header); // Réinitialiser totalReceived pour recevoir les données après le header
+    while (totalReceived < dataSize)
+    {
+        //std::cout << "recv..." << std::endl;
+        bytesReceived = recv(tcpSocket, buffer + totalReceived, dataSize - totalReceived, 0);
+        if (bytesReceived <= 0)
+        {
+            int wsaError = WSAGetLastError();
+            if (wsaError == 10035)
+            { // socket en mode non bloquant n'a rien reçu
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+            std::cerr << "Error receiving message: " << wsaError << std::endl;
+            return false;
+        }
+        totalReceived += bytesReceived;
+        //std::cout << totalReceived << std::endl;
+    }
+
+    if (header == Header::VERSION)
+    {
+        // Copier les données reçues (y compris le header) dans la structure NetworkEntity
+        std::memcpy(&nv, buffer, dataSize);
+
+        // Convertir les champs en endian correct si nécessaire
+        nv.version = ntohl(nv.version);
+
+        std::cout << "Version received: " << nv.version << std::endl;
     }
 
     return true;
@@ -271,7 +285,7 @@ bool Connection::recvNPSTCP(NetworkPaddleStart& nps, bool& run)
 
     // Définir la taille des données en fonction du header
     unsigned long dataSize = 0;
-    if (header == 5)
+    if (header == Header::NPS)
     {
         //std::cout << "Header " << header << " received" << std::endl;
         dataSize = sizeof(NetworkPaddleStart);
@@ -381,7 +395,7 @@ short Connection::recvUDP(NetworkPaddle& np, NetworkBall& nb)
             nb.velocityX    = ntohl(nb.velocityX);
             nb.velocityZ    = ntohl(nb.velocityZ);
             nb.timestamp    = ntohl(nb.timestamp);
-            std::cout << "[UDP] Ball reçue: x=" << (float)(nb.x / 1000.0f) << ", z=" << (float)(nb.z / 1000.0f) << " velocityX: " << (float)(nb.velocityX / 1000.0f) << " velocityZ: " << (float)(nb.velocityZ / 1000.0f) << " :: " << nb.timestamp << std::endl;
+            //std::cout << "[UDP] Ball reçue: x=" << (float)(nb.x / 1000.0f) << ", z=" << (float)(nb.z / 1000.0f) << " velocityX: " << (float)(nb.velocityX / 1000.0f) << " velocityZ: " << (float)(nb.velocityZ / 1000.0f) << " :: " << nb.timestamp << std::endl;
             return Header::BALL;
         }
     }
@@ -411,48 +425,22 @@ void Connection::sendNPUDP(NetworkPaddle& np)
     }
 }
 
-void Connection::recvNEUDP(NetworkEntity& ne)
+void Connection::sendNSTCP(NetworkSpell ns)
 {
-    NetworkEntity ne2;
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(udpSocket, &readfds);
-    int udpServerAddrLen = sizeof(udpServerAddr);
-
-    // Configurer le timeout
-    timeval timeout;
-    timeout.tv_sec = 1; // Attendez 1 seconde
-    timeout.tv_usec = 0;
-
-    // Appeler select
-    int result = select(0, &readfds, NULL, NULL, &timeout);
-    if (result == SOCKET_ERROR) std::cerr << "Erreur lors de l'appel de select." << std::endl;
-    else if (result == 0) std::cout << "Delai d'attente ecoule." << std::endl;//no data available
-    else {
-        // Des données sont disponibles sur le socket
-        if (FD_ISSET(udpSocket, &readfds)) {
-            int bytesReceived = recvfrom(udpSocket, (char*)&ne2, sizeof(ne2), 0, (sockaddr*)&udpServerAddr, &udpServerAddrLen);
-            if (bytesReceived == SOCKET_ERROR) {
-                std::cerr << "Erreur lors de la reception des donnees: " << WSAGetLastError() << std::endl;
-            }
-            else if (bytesReceived == 0) {
-                std::cout << "Aucune donnee recue." << std::endl;
-                return;
-            }
-
-            ne.id = ntohl(ne2.id);
-            ne.xMap = ntohl(ne2.xMap);
-            ne.yMap = ntohl(ne2.yMap);
-
-            float x = (float)ne.xMap / 100;
-            float y = (float)ne.yMap / 100;
-
-            std::cout << "ID: " << ne.id << ", X: " << x << ", Y: " << y << std::endl;
-            if (bytesReceived == SOCKET_ERROR) {
-                std::cerr << "Erreur lors de la reception des donnees: " << WSAGetLastError() << std::endl;
-            }
-        }
+    if (tcpSocket == INVALID_SOCKET) 
+    {
+        std::cerr << "Invalid TCP socket." << std::endl;
+        return;
     }
+
+    ns.header   = htons(ns.header);
+    ns.spellID  = htons(ns.spellID);
+
+    int iResult = ::send(tcpSocket, (const char*)&ns, sizeof(ns), 0);
+    if (iResult == SOCKET_ERROR) {
+        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+    }
+    //std::cout << "Bytes Sent: " << iResult << std::endl;
 }
 
 void Connection::setWaitingModeTCP(bool wait)

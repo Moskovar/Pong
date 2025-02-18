@@ -14,17 +14,15 @@ class Connection
 		Connection();
 		~Connection();
 
-		void sendNETCP(NetworkEntity ne);
-		void sendNESTCP(NetworkEntitySpell nes);
-		void sendNESETCP(NetworkEntitySpellEffect nes);
-		void sendNETTCP(NetworkEntityTarget net);
 		bool recvTCP(NetworkBall& nball, GLboolean& run);
-
+		bool recvVersionTCP(NetworkVersion& nv);
 		bool recvNPSTCP(NetworkPaddleStart& nps, bool& run);
+
 		short recvUDP(NetworkPaddle& np, NetworkBall& nb);//retourne le header de la modif, -1 si pas de modif
 
 		void sendNPUDP(NetworkPaddle& np);
-		void recvNEUDP(NetworkEntity& ne);
+
+		void sendNSTCP(NetworkSpell ns);
 
 		void setWaitingModeTCP(bool wait);
 

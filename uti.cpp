@@ -8,11 +8,6 @@ std::map <int, std::string> gl_textures_string =
 	{ GL_TEXTURE3, "texture3" }
 };
 
-std::map<int, AABB> obj_hitboxes =
-{
-	{}
-};
-
 bool isPointInOBB(const glm::vec3& point, const OBB& obb) {
 	// Transformer le point dans le système de coordonnées de l'OBB
 	glm::vec3 pointInLocal = glm::inverse(obb.orientation) * (point - obb.center);
@@ -21,11 +16,6 @@ bool isPointInOBB(const glm::vec3& point, const OBB& obb) {
 	return (pointInLocal.x >= -obb.halfSize.x && pointInLocal.x <= obb.halfSize.x) &&
 		(pointInLocal.y >= -obb.halfSize.y && pointInLocal.y <= obb.halfSize.y) &&
 		(pointInLocal.z >= -obb.halfSize.z && pointInLocal.z <= obb.halfSize.z);
-}
-
-int getCellCenter(GLfloat xOrZ, int cellWidth)
-{
-	return (int)xOrZ / 8 * 8 + 4;
 }
 
 std::map<std::string, int> animationIDs =

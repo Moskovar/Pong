@@ -19,7 +19,7 @@ GLfloat width = 1920.0f, height = 1080.0f;
 
 Connection co;
 
-std::mutex mtx;
+std::mutex mtx, mtx_ball;
 
 Window*         window          = nullptr;
 Camera*         camera          = nullptr;
@@ -44,9 +44,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
         switch (key)
         {
-        case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, true);   break;
+            case GLFW_KEY_ESCAPE:   glfwSetWindowShouldClose(window, true);             break;
+            case GLFW_KEY_Q:        co.sendNSTCP({ Header::SPELL, SpellID::GRAVITY });  break;
         }
-    }
+    }   
     else if (action == GLFW_RELEASE)
     {
         keyPressed[key] = false;
@@ -222,8 +223,16 @@ void receive_data_udp()
         headerReceived = co.recvUDP(np, nb);
         switch(headerReceived)
         {
-            case Header::NP:   players[1]->update(np);  break;
-            case Header::BALL: ball->update(nb);        break;
+            case Header::NP:   if(players[1]) players[1]->update(np);  break;
+            //case Header::BALL: ball->update(nb);        break;
+            case Header::BALL: 
+                //std::cout << "Ball          -> " << ball->getX() << " : " << ball->getZ() << std::endl;
+                mtx_ball.lock();
+                ball->updateInterpolate(nb);
+                mtx_ball.unlock();
+                //std::cout << "Ball received -> " << (float)(nb.x / 1000.0f) << " : " << (float)(nb.z / 1000.0f) << std::endl;
+                break;
+                
         }
 
         //std::cout << "Coucou thread" << std::endl;
@@ -240,7 +249,12 @@ void receive_data_tcp()
         if (co.recvTCP(nball, run))
         {
             //mtx.lock();
-            if (ball) ball->update(nball);
+            if (ball)
+            {
+                mtx_ball.lock();
+                ball->update(nball);
+                mtx_ball.unlock();
+            }
             else std::cout << "BALL nullptr" << std::endl;
             //mtx.unlock();
         }
@@ -251,12 +265,17 @@ int main()
 {
 	std::cout << "Hello Pong !" << std::endl;
 
+    NetworkVersion nv;
+    co.recvVersionTCP(nv);
+
+    if (nv.version != 1010) return 0;
+
+    std::cout << "Waiting for matchmaking..." << std::endl;
+
     bool runt = true;
     NetworkPaddleStart nps1, nps2;
     co.recvNPSTCP(nps1, runt);
-    //std::cout << "HEADER: " << nps1.header << " : " << nps1.id << " : " << nps1.side << std::endl;
     co.recvNPSTCP(nps2, runt);
-    //std::cout << "HEADER: " << nps2.header << " : " << nps2.id << " : " << nps2.side << std::endl;
 
     //--- Chargement du contexte OpenGL ---//
     window = new Window(width, height);
@@ -292,14 +311,10 @@ int main()
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f,  40.0f), "models/fbx/wall.fbx"));
 
-    physicsEngine = new PhysicsEngine(&players, &walls, ball);
-
-    //std::cout << "MAXPOINT: " << ball->getRHitbox().maxPoint.x << " : " << ball->getRHitbox().maxPoint.y << " : " << ball->getRHitbox().maxPoint.z << std::endl;
-
-    std::cout << "MINPOINT: " << walls[0].getRHitbox().minPoint.x << " : " << walls[0].getRHitbox().minPoint.y << " : " << walls[0].getRHitbox().minPoint.z << std::endl;
-    std::cout << "MAXPOINT: " << walls[0].getRHitbox().maxPoint.x << " : " << walls[0].getRHitbox().maxPoint.y << " : " << walls[0].getRHitbox().maxPoint.z << std::endl;
-    std::cout << "MINPOINT: " << walls[1].getRHitbox().minPoint.x << " : " << walls[1].getRHitbox().minPoint.y << " : " << walls[1].getRHitbox().minPoint.z << std::endl;
-    std::cout << "MAXPOINT: " << walls[1].getRHitbox().maxPoint.x << " : " << walls[1].getRHitbox().maxPoint.y << " : " << walls[1].getRHitbox().maxPoint.z << std::endl;
+    //std::cout << "MINPOINT: " << walls[0].getRHitbox().minPoint.x << " : " << walls[0].getRHitbox().minPoint.y << " : " << walls[0].getRHitbox().minPoint.z << std::endl;
+    //std::cout << "MAXPOINT: " << walls[0].getRHitbox().maxPoint.x << " : " << walls[0].getRHitbox().maxPoint.y << " : " << walls[0].getRHitbox().maxPoint.z << std::endl;
+    //std::cout << "MINPOINT: " << walls[1].getRHitbox().minPoint.x << " : " << walls[1].getRHitbox().minPoint.y << " : " << walls[1].getRHitbox().minPoint.z << std::endl;
+    //std::cout << "MAXPOINT: " << walls[1].getRHitbox().maxPoint.x << " : " << walls[1].getRHitbox().maxPoint.y << " : " << walls[1].getRHitbox().maxPoint.z << std::endl;
     //std::cout << "MAXPOINT: " << ball->getRHitbox().maxPoint.x << " : " << ball->getRHitbox().maxPoint.y << " : " << ball->getRHitbox().maxPoint.z << std::endl;
 
     players.push_back(new Player(nps1.gameID, nps1.id, nps1.side));
@@ -307,20 +322,7 @@ int main()
 
     ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
 
-    //NetworkBall nb;
-
-    //if (co.recvTCP(nb, run))
-    //{
-    //    //mtx.lock();
-    //    if (ball) ball->update(nb);
-    //    else std::cout << "BALL nullptr" << std::endl;
-    //    //mtx.unlock();
-    //}
-    //else
-    //{
-    //    std::cout << "NO BALL DATA RECEIVED, EXIT" << std::endl;
-    //    run = false;
-    //}
+    physicsEngine = new PhysicsEngine(&players, &walls, ball, &mtx_ball);
 
     std::thread t_receive_data_udp(receive_data_udp);
     std::thread t_receive_data_tcp(receive_data_tcp);
@@ -338,13 +340,6 @@ int main()
         glm::vec3 worldPos;
         findRayIntersectionWithMap(camera->getPosition(), generateRayFromCursor(glfwWindow), worldPos);
 
-        //std::cout << "worldPos: " << worldPos.x << " : " << worldPos.y << " : " << worldPos.z << std::endl;
-
-        //if (players[0]->getNP().id == 0) std::cout << worldPos.z << std::endl;
-
-        std::cout << "IS WORLPOS IN OBB: " << isPointInOBB(worldPos, walls[0].getRHitbox()) << std::endl;;
-
-
         if (players[0])
         {
             glm::vec3 wpos = players[0]->getPaddle()->getPosition();
@@ -352,12 +347,10 @@ int main()
 
             OBB obb2 = players[0]->getPaddle()->getOBBAtPos(wpos);
 
-            bool collision = false;
             for (Element& wall : walls)
             {
                 if (distanceBetweenHitboxes(obb2, wall.getRHitbox()) == 0)
                 {
-                    collision = false;
                     OBB wallOBB = wall.getRHitbox();
                     worldPos.z = (worldPos.z > 0) ? wallOBB.center.z - wallOBB.halfSize.z - players[0]->getPaddle()->getWidth() / 2.0f //pour les obstacles > 0
                                                   : wallOBB.center.z + wallOBB.halfSize.z + players[0]->getPaddle()->getWidth() / 2.0f;//pour les obstacles < 0 
@@ -365,19 +358,17 @@ int main()
                 }
             }
 
-            if (!collision)
+            GLfloat z = players[0]->getPaddle()->getPosition().z;
+            players[0]->getPaddle()->setPositionZ(worldPos.z);
+            if (players[0]->getPaddle()->getPosition().z != z)//si le paddle a changé de position
             {
-                GLfloat z = players[0]->getPaddle()->getPosition().z;
-                players[0]->getPaddle()->setPositionZ(worldPos.z);
-                if (players[0]->getPaddle()->getPosition().z != z)//si le paddle a changé de position
-                {
-                    //std::cout << "pos changed, send udp..." << std::endl;
-                    NetworkPaddle np = players[0]->getNP();
-                    //std::cout << players[0]->getPaddle()->getPosition().z << " : " << np.z << std::endl;
-                    co.sendNPUDP(np);
-                }
-            }            
+                //std::cout << "pos changed, send udp..." << std::endl;
+                NetworkPaddle np = players[0]->getNP();
+                //std::cout << players[0]->getPaddle()->getPosition().z << " : " << np.z << std::endl;
+                co.sendNPUDP(np);
+            }        
         }
+
         glm::vec3 maxp = walls[0].getMaxPoint(), minp = walls[0].getMinPoint();
         glm::vec3 maxp2 = walls[0].getModel()->getMaxPoint(), minp2 = walls[0].getModel()->getMinPoint();
 
@@ -397,8 +388,8 @@ int main()
         ball->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
         for(Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
-        //physicsEngine->run(deltaTime);
-        ball->move(deltaTime);
+        physicsEngine->run(deltaTime);
+        //ball->move(deltaTime);
         
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();

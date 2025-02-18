@@ -15,25 +15,27 @@ public:
 	~Element();
 
 	//--- Getters ---//
-	Model* getModel() { return model; }
-	glm::vec3	getPosition() { return position; }
-	glm::vec3* getPositionP() { return &position; }
-	GLfloat		getY() { return position.y; }
-	GLfloat		getYaw() { return yaw; }
-	GLfloat* getPYaw() { return &yaw; }
-	OBB& getRHitbox() { return hitbox; }
-	glm::vec3   getMaxPoint() { return hitbox.maxPoint; }
-	glm::vec3   getMinPoint() { return hitbox.minPoint; }
-	bool		isMoving() { return moving; }
-	bool		isFalling() { return falling; }
-	glm::mat4	getModelMtx() { return modelMatrix; }
-	uint8_t		getDirectionValue() { return movingValue; }
+	Model*		getModel()			{ return model;				}
+	glm::vec3	getPosition()		{ return position;			}
+	glm::vec3*	getPositionP()		{ return &position;			}
+	GLfloat		getX()				{ return position.x;		}
+	GLfloat		getY()				{ return position.y;		}
+	GLfloat		getZ()				{ return position.z;		}
+	GLfloat		getYaw()			{ return yaw;				}
+	GLfloat*	getPYaw()			{ return &yaw;				}
+	OBB&		getRHitbox()		{ return hitbox;			}
+	glm::vec3   getMaxPoint()		{ return hitbox.maxPoint;	}
+	glm::vec3   getMinPoint()		{ return hitbox.minPoint;	}
+	bool		isMoving()			{ return moving;			}
+	bool		isFalling()			{ return falling;			}
+	glm::mat4	getModelMtx()		{ return modelMatrix;		}
+	uint8_t		getDirectionValue() { return movingValue;		}
 
 	glm::mat4	getAnticipatedMove(GLfloat deltaTime);
 	glm::mat4   getAnticipatedFall(GLfloat deltaTime);
-	OBB		getAnticipatedMoveHitbox(GLfloat deltaTime);
-	OBB getOBBAtPos(glm::vec3 pos);
-	OBB		getAnticipatedFallHitbox(GLfloat deltaTime);
+	OBB			getAnticipatedMoveHitbox(GLfloat deltaTime);
+	OBB			getOBBAtPos(glm::vec3 pos);
+	OBB			getAnticipatedFallHitbox(GLfloat deltaTime);
 
 
 	//--- Setters ---//

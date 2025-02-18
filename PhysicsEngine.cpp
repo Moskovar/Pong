@@ -1,10 +1,11 @@
 #include "PhysicsEngine.h"
 
-PhysicsEngine::PhysicsEngine(std::vector<Player*>* players, std::vector<Element>* walls, Ball* ball)
+PhysicsEngine::PhysicsEngine(std::vector<Player*>* players, std::vector<Element>* walls, Ball* ball, std::mutex* mtx_ball)
 {
     this->players   = players;
     this->walls     = walls;
     this->ball      = ball;
+    this->mtx_ball  = mtx_ball;
 }
 
 GLfloat PhysicsEngine::distanceBetweenHitboxes(Element* e1, Element* e2)
@@ -60,46 +61,112 @@ GLfloat PhysicsEngine::distanceBetweenHitboxes(Element* e1, Element* e2)
 
 void PhysicsEngine::run(GLfloat& deltaTime)
 {
-    //std::cout << ball->getPosition().z << std::endl;
-    for (Player* p : *players)
+    float distance;
+    Element* element = nullptr;
+    short isPaddle = true;//pour vérifier le type d'Element, plus rapide qu'un dynamic cast ?
+
+    Player* p1 = ((*players)[0]->getSide() == -1) ? (*players)[0] : (*players)[1], * p2 = ((*players)[1]->getSide() == 1) ? (*players)[1] : (*players)[0];
+
+    mtx_ball->lock();
+    if (ball->getVelocityX() < 0 && p1)
     {
-        GLfloat distance = distanceBetweenHitboxes(p->getPaddle(), ball);
-        if (distance == 0)
+        element = p1->getPaddle();
+
+        if (!element)
         {
-            //std::cout << "DISTANCE == 0" << std::endl;
-
-            ball->turnBack();
-
-            GLfloat velocityZ = (ball->getPosition().z - p->getPaddle()->getPosition().z) / (p->getPaddle()->getWidth() / 2);
-
-            if (p->getSide() == 1) velocityZ *= -1;
-
-            std::cout << ball->getPosition().z - p->getPaddle()->getPosition().z << std::endl;
-            std::cout << velocityZ << std::endl;
-
-            ball->setVelocityZ(velocityZ);
-
-            while (distanceBetweenHitboxes(p->getPaddle(), ball) == 0)
-                ball->move(deltaTime);
-            
+            mtx_ball->unlock();
             return;
         }
-        else if (p->getSide() == ball->getDirection())//si la balle se dirige dans la direction du joueur
+
+        //std::cout << "P1" << std::endl;
+
+        if (ball->getX() < element->getX() - 10)
         {
-            if (p->getSide() == -1 && ball->getPosition().x < p->getPaddle()->getPosition().x - 5.0f || p->getSide() == 1 && ball->getPosition().x > p->getPaddle()->getPosition().x + 5.0f) 
-                ball->setPositionX(15);
+            std::cout << "OUT! P1" << std::endl;
+            //return;
+            //resetRound();
+            //lastWinner = p2;
+        }
+    }
+    else if (ball->getVelocityX() > 0 && p2)
+    {
+        element = p2->getPaddle();
+
+        if (!element)
+        {
+            mtx_ball->unlock();
+            return;
+        }
+
+        //std::cout << "P2" << std::endl;
+
+        if (ball->getX() > element->getX() + 10)
+        {
+            std::cout << "OUT! P2" << std::endl;
+            //return;
+            //resetRound();
+            //lastWinner = p1;
+        }
+    }
+    //else return;
+
+    if (!element)
+    {
+        mtx_ball->unlock();
+        return;
+    }
+
+    distance = distanceBetweenHitboxes(ball, element);
+
+    //std::cout << distance << std::endl;
+
+    //Si la distance avec le joueur est > 0, alors on vérifie la distance avec les murs
+    if (distance > 0)
+    {
+        for (Element& wall : *walls)
+        {
+            distance = distanceBetweenHitboxes(&wall, ball);
+
+            if (distance == 0)//Si distance avec le mur == 0, on sort
+            {
+                element = &wall;
+                isPaddle = false;//passe à un si on est au contact d'un wall, sinon reste à 0
+                break;
+            }
         }
     }
 
-    for (Element& wall : *walls)
+    //Si la distance avec le dernier élément comparé est > 0, on déplace la balle, sinon on traite la collision en fonction de l'élément
+    if (distance > 0 || ball->getLastElementHit() == element)
     {
-        GLfloat distance = distanceBetweenHitboxes(&wall, ball);
+        ball->move(deltaTime);
+    }
+    else
+    {
+        if (isPaddle)
+        {
+            std::cout << "COLLISION AVEC PADDLE" << std::endl;
 
-        if (distance == 0)
+            //---- VelocityX ---//
+            ball->turnBack();
+
+            //--- VelocityZ ---//
+            float velocityZ = (ball->getZ() - element->getZ()) / (static_cast<Paddle*>(element)->getWidth() / 2);
+
+
+            ball->setVelocityZ(velocityZ);
+        }
+        else
         {
             ball->setVelocityZ(-ball->getVelocityZ());
-
-            while (distanceBetweenHitboxes(&wall, ball) == 0) ball->move(deltaTime);
         }
+
+        ball->setLastElementHit(element);
+
+        //while (distanceBetweenHitboxes(ball, element) == 0)
+        //{
+        //    ball->move(deltaTime);
+        //}
     }
+    mtx_ball->unlock();
 }

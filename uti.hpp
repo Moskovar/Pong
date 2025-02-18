@@ -100,101 +100,38 @@ struct HeightMapVertex
 };
 
 extern std::map <int, std::string>	gl_textures_string;
-extern std::map<int, AABB>			obj_hitboxes;
-
-enum HITBOXES
-{
-	FOUNDATION
-};
-
-enum DirectionValue
-{
-	NONE = 0,
-
-	FORWARD = 1,
-	RIGHT = 2,
-	BACKWARD = 4,
-	LEFT = 8,
-
-	FORWARD_RIGHT = 3,
-	FORWARD_BACK = 5,
-	FORWARD_LEFT = 9,
-	BACK_RIGHT = 6,
-	RIGHT_LEFT = 10,
-	BACK_LEFT = 12,
-
-	FORWARD_RIGHT_BACK = 7,
-	FORWARD_RIGHT_LEFT = 11,
-	FORWARD_LEFT_BACK = 13,
-	BACK_RIGHT_LEFT = 14,
-
-	ALL = 15
-};
-
-enum HumanTowers
-{
-	HumanBaseTower,
-	ArcherTower
-};
-
-int getCellCenter(GLfloat xOrZ, int cellWidth = 8);
 
 extern std::map<std::string, int> animationIDs;
 
 
 
 //--- Network ---//
-enum Header {
-	NE = 0,
-	NES = 1,
-	NESE = 2,
-	NEF = 3,
-	NET = 4,
+enum Header 
+{
+	VERSION,
 	NPS,
 	NP,
-	BALL
+	BALL,
+	SPELL
+};
+
+enum SpellID
+{
+	GRAVITY
 };
 
 #pragma pack(push, 1)
-struct NetworkEntity {
-	short header = Header::NE;
-	short id = 0, countDir = 0, hp = 0;
-	int   xMap = 0, yMap = 0;
-	uint64_t timestamp; // En microsecondes depuis l'epoch
-};
-#pragma pack(pop)
-
-#pragma pack(push, 1)
-struct NetworkEntitySpell {
-	short header = Header::NES;
-	short id = 0, spellID = 0;
+struct NetworkVersion
+{
+	short header = Header::VERSION;
+	int version = 0;
 };
 #pragma pack(pop)
 
 #pragma pack(push, 1)
-struct NetworkEntitySpellEffect {
-	short header = Header::NESE;
-	short id = 0, spellID = 0;
-};
-#pragma pack(pop)
-
-#pragma pack(push, 1)
-struct NetworkEntityFaction {
-	short header = Header::NEF;
-	short id = 0, faction = 1;
-};
-#pragma pack(pop)
-
-#pragma pack(push, 1)
-struct NetworkEntityTarget {
-	short header = Header::NET;
-	short id = 0, targetID = -1;
-};
-#pragma pack(pop)
-
-#pragma pack(push, 1)
-struct NetworkPaddleStart {
-	short header = Header::NET;
+struct NetworkPaddleStart 
+{
+	short header = Header::NPS;
 	short gameID = 0, id = 0, side = 0;
 };
 #pragma pack(pop)
@@ -213,6 +150,14 @@ struct NetworkBall
 {
 	short header = Header::BALL;
 	int x = 0, z = 0, velocityX = 0, velocityZ = 0, timestamp = -1;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+struct NetworkSpell
+{
+	short header = Header::SPELL;
+	short spellID = 0;
 };
 #pragma pack(pop)
 

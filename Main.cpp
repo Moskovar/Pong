@@ -72,6 +72,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
         if (menu_buttons_pressed[play])
         {
+            co.sendMatchmakingTCP();
+
             b_run_menu = false;
             b_run_game = true;
         }

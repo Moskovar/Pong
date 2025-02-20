@@ -109,6 +109,7 @@ extern std::map<std::string, int> animationIDs;
 enum Header 
 {
 	VERSION,
+	MATCHMAKING,
 	NPS,
 	NP,
 	BALL,
@@ -126,6 +127,13 @@ struct NetworkVersion
 {
 	short header = Header::VERSION;
 	int version = 0;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+struct NetworkMatchmaking
+{
+	short header = Header::MATCHMAKING;
 };
 #pragma pack(pop)
 

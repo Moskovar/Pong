@@ -20,8 +20,8 @@ class Connection
 
 		short recvUDP(NetworkPaddle& np, NetworkBall& nb);//retourne le header de la modif, -1 si pas de modif
 
+		void sendMatchmakingTCP();
 		void sendNPUDP(NetworkPaddle& np);
-
 		void sendNSTCP(NetworkSpell ns);
 
 		void setWaitingModeTCP(bool wait);

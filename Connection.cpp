@@ -419,6 +419,25 @@ short Connection::recvUDP(NetworkPaddle& np, NetworkBall& nb)
     return -1; // Aucun message valide reçu
 }
 
+void Connection::sendMatchmakingTCP()
+{
+    if (tcpSocket == INVALID_SOCKET)
+    {
+        std::cerr << "Invalid TCP socket." << std::endl;
+        return;
+    }
+
+    NetworkMatchmaking nm;
+    // Convertir en Big-Endian
+    nm.header = htons(nm.header);
+
+    int iResult = ::send(tcpSocket, (const char*)&nm, sizeof(nm), 0);
+    if (iResult == SOCKET_ERROR) {
+        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+    }
+    //std::cout << "Bytes Sent: " << iResult << std::endl;
+}
+
 void Connection::sendNPUDP(NetworkPaddle& np)
 {
     //std::cout << "SENT: " << np.gameID << " : " << np.id << " : " << np.z << std::endl;

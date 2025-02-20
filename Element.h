@@ -31,6 +31,7 @@ public:
 	glm::mat4	getModelMtx()		{ return modelMatrix;		}
 	uint8_t		getDirectionValue() { return movingValue;		}
 	GLfloat		getMoveSpeed()		{ return moveSpeed;			}
+	glm::vec3	getRotations()		{ return rotations;			}
 
 	glm::mat4	getAnticipatedMove(GLfloat deltaTime);
 	glm::mat4   getAnticipatedFall(GLfloat deltaTime);
@@ -56,7 +57,8 @@ public:
 	void moveAtZ(GLfloat positionZ);
 	void translate(glm::vec3 translation);
 	void turn(GLfloat yaw);
-	void fall(GLfloat deltaTime);
+	void turn(GLfloat yaw, glm::vec3 axes);
+	void resetRotations();
 	void updatePosition();
 	void updateModelMatrixFromPosition();
 
@@ -72,6 +74,8 @@ protected:
 	glm::mat4 modelMatrix = glm::mat4(1.0f);
 	glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
 	GLfloat yaw = -90.0f;//à descendre dans entity ? avec render en méthode abstraite ?
+
+	glm::vec3 rotations = glm::vec3(0.0f, 0.0f, 0.0f);
 	GLfloat moveSpeed = 10.0f;
 	bool moving = false, falling = false;
 	std::chrono::high_resolution_clock::time_point startTime;//pour l'animation de l'élément (chaque élément a son start time (quand il est créée et reset quand il change d'animation))

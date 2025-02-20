@@ -29,12 +29,14 @@ Ball*           ball            = nullptr;
 glm::mat4*  view    = nullptr;
 glm::mat4   projection;
 
-std::map<char, bool>    keyPressed;
-std::map<int, bool>     mousePressed;
+std::map<std::string, Shader>   shaders;
+std::map<char, bool>            keyPressed;
+std::map<int, bool>             mousePressed;
 
 std::vector<Player*> players;
+std::vector<Element> walls;
 
-GLboolean run = true;
+GLboolean b_run = true, b_run_menu = true, b_run_game = false;
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -44,8 +46,11 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
         switch (key)
         {
-            case GLFW_KEY_ESCAPE:   glfwSetWindowShouldClose(window, true);             break;
-            case GLFW_KEY_Q:        co.sendNSTCP({ Header::SPELL, SpellID::GRAVITY });  break;
+            case GLFW_KEY_ESCAPE:   
+                glfwSetWindowShouldClose(window, true);
+                if (b_run_menu) b_run = false;
+                break;
+            case GLFW_KEY_Q:        /*co.sendNSTCP({Header::SPELL, SpellID::GRAVITY});*/ break;
         }
     }   
     else if (action == GLFW_RELEASE)
@@ -218,7 +223,7 @@ void receive_data_udp()
 
     short headerReceived = -1;
 
-    while (run)
+    while (b_run_game)
     {
         headerReceived = co.recvUDP(np, nb);
         switch(headerReceived)
@@ -245,9 +250,9 @@ void receive_data_tcp()
     NetworkBall nball;
     short header = 0;
 
-    while (run)
+    while (b_run_game)
     {
-        header = co.recvTCP(nball, run);
+        header = co.recvTCP(nball, b_run_game);
         if(header == Header::BALL)
         {
             //mtx.lock();
@@ -263,17 +268,65 @@ void receive_data_tcp()
     }
 }
 
-void run_game();
-
-int main()
+void run_menu()
 {
-	std::cout << "Hello Pong !" << std::endl;
+    Element play(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/play_fr.fbx");
 
-    NetworkVersion nv;
-    co.recvVersionTCP(nv);
+    auto    startTime = std::chrono::high_resolution_clock::now();
+    float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
+            lastFrame = glfwGetTime(), deltaTime = 0, now = 0;
 
-    if (nv.version != 1010) return 0;
+    GLFWwindow* glfwWindow = window->getGLFWWindow();
 
+    while (!glfwWindowShouldClose(glfwWindow) && b_run_menu)
+    {
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        timeSinceStart = std::chrono::duration<float>(currentTime - startTime).count();
+
+        //DeltaTime
+        now = glfwGetTime();
+        deltaTime = now - lastFrame;
+        lastFrame = now;
+
+        glm::vec3 worldPos;
+        findRayIntersectionWithMap(camera->getPosition(), generateRayFromCursor(glfwWindow), worldPos);
+
+        //std::cout << "WorldPos: " << worldPos.z << std::endl;
+
+        bool inPlay = isPointInOBB(worldPos, play.getRHitbox());
+
+        if (inPlay && play.getRotations().x > -25)
+        {
+            //std::cout << "PLAY" << std::endl;
+            play.turn(-25, glm::vec3(1.0f, 0.0f, 0.0f));
+            //b_run_menu = false;
+            //b_run_game = true;
+        }
+        else if(!inPlay && play.getRotations().x != 0.0f)
+        {
+            play.resetRotations();
+        }
+
+        // Effacer le buffer de couleur et de profondeur
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        shaders["AnimatedObject"].use();
+        play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
+        window->resetXYChange();
+
+        //Swap buffers
+        glfwSwapBuffers(glfwWindow);
+        glfwPollEvents();
+    }
+
+    b_run_menu = false;//mettre à false pour si on press escape -> glfwWindowShouldClose
+}
+
+void run_game()
+{
+    //--- Chargement du jeu ---// //créer un chargement après que la game soit créée
     std::cout << "Waiting for matchmaking..." << std::endl;
 
     bool runt = true;
@@ -281,39 +334,11 @@ int main()
     co.recvNPSTCP(nps1, runt);
     co.recvNPSTCP(nps2, runt);
 
-    //--- Chargement du contexte OpenGL ---//
-    window = new Window(width, height);
-    window->fullScreen();
-    window->keepCursorInWindow();
-    window->createCallbacks();
-    GLFWwindow* glfwWindow = window->getGLFWWindow();
+    std::thread t_receive_data_udp(receive_data_udp);
+    std::thread t_receive_data_tcp(receive_data_tcp);
 
-    glfwSetKeyCallback(glfwWindow, keyCallback);
-    glfwSetMouseButtonCallback(glfwWindow, mouse_button_callback);  // Clics de souris
-
-    glm::vec3 target = glm::vec3(0.0, 0.0f, 0.0f);
-
-    //--- Chargement de la caméra ---//
-    camera = new Camera();
-
-    view = camera->getViewMatrixP();
-    projection = glm::perspective(glm::radians(45.0f), width / height, 0.1f, 100.0f);
-
-    //--- Chargement des shaders ---//
-    std::map<std::string, Shader> shaders;
-    shaders["AnimatedObject"] = Shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", view, &projection);
-
-    // Activer le test de profondeur
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    auto    startTime       = std::chrono::high_resolution_clock::now();
-    float   currentFrame    = 0, animationTime = 0, timeSinceStart = 0,
-            lastFrame       = glfwGetTime(), deltaTime = 0, now = 0;
-
-    std::vector<Element> walls;
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
-    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f,  40.0f), "models/fbx/wall.fbx"));
+    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, 40.0f), "models/fbx/wall.fbx"));
 
     //std::cout << "MINPOINT: " << walls[0].getRHitbox().minPoint.x << " : " << walls[0].getRHitbox().minPoint.y << " : " << walls[0].getRHitbox().minPoint.z << std::endl;
     //std::cout << "MAXPOINT: " << walls[0].getRHitbox().maxPoint.x << " : " << walls[0].getRHitbox().maxPoint.y << " : " << walls[0].getRHitbox().maxPoint.z << std::endl;
@@ -329,11 +354,15 @@ int main()
     ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
 
     physicsEngine = new PhysicsEngine(&players, &walls, ball, &mtx_ball);
+    //--- Fin chargement jeu ---//
 
-    std::thread t_receive_data_udp(receive_data_udp);
-    std::thread t_receive_data_tcp(receive_data_tcp);
+    auto    startTime = std::chrono::high_resolution_clock::now();
+    float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
+            lastFrame = glfwGetTime(), deltaTime = 0, now = 0;
 
-    while (!glfwWindowShouldClose(glfwWindow) && run)
+    GLFWwindow* glfwWindow = window->getGLFWWindow();
+
+    while (!glfwWindowShouldClose(glfwWindow) && b_run_game)
     {
         auto currentTime = std::chrono::high_resolution_clock::now();
         timeSinceStart = std::chrono::duration<float>(currentTime - startTime).count();
@@ -361,7 +390,7 @@ int main()
                 {
                     OBB wallOBB = wall.getRHitbox();
                     worldPos.z = (worldPos.z > 0) ? wallOBB.center.z - wallOBB.halfSize.z - players[0]->getPaddle()->getWidth() / 2.0f //pour les obstacles > 0
-                                                  : wallOBB.center.z + wallOBB.halfSize.z + players[0]->getPaddle()->getWidth() / 2.0f;//pour les obstacles < 0 
+                        : wallOBB.center.z + wallOBB.halfSize.z + players[0]->getPaddle()->getWidth() / 2.0f;//pour les obstacles < 0 
                     break;
                 }
             }
@@ -374,7 +403,7 @@ int main()
                 NetworkPaddle np = players[0]->getNP();
                 //std::cout << players[0]->getPaddle()->getPosition().z << " : " << np.z << std::endl;
                 co.sendNPUDP(np);
-            }        
+            }
         }
 
         glm::vec3 maxp = walls[0].getMaxPoint(), minp = walls[0].getMinPoint();
@@ -394,11 +423,13 @@ int main()
             p->getPaddle()->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
         ball->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
-        for(Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        for (Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        //play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
         physicsEngine->run(deltaTime);
         //ball->move(deltaTime);
-        
+
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();
 
@@ -407,10 +438,58 @@ int main()
         glfwPollEvents();
     }
 
-    run = false;
+    b_run       = false;
+    b_run_game  = false;
 
     t_receive_data_udp.join();
     t_receive_data_tcp.join();
+}
+
+int main()
+{
+	std::cout << "Hello Pong !" << std::endl;
+
+    NetworkVersion nv;
+    co.recvVersionTCP(nv);
+
+    if (nv.version != 1010) return 0;
+
+    //--- Chargement du contexte OpenGL ---//
+    window = new Window(width, height);
+    window->fullScreen();
+    window->keepCursorInWindow();
+    window->createCallbacks();
+    GLFWwindow* glfwWindow = window->getGLFWWindow();
+
+    glfwSetKeyCallback(glfwWindow, keyCallback);
+    glfwSetMouseButtonCallback(glfwWindow, mouse_button_callback);  // Clics de souris
+
+    glm::vec3 target = glm::vec3(0.0, 0.0f, 0.0f);
+
+    //--- Chargement de la caméra ---//
+    camera = new Camera();
+
+    view = camera->getViewMatrixP();
+    projection = glm::perspective(glm::radians(45.0f), width / height, 0.1f, 120.0f);
+
+    //--- Chargement des shaders ---//
+    shaders["AnimatedObject"] = Shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", view, &projection);
+
+    // Activer le test de profondeur
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    while (b_run)
+    {
+        if (b_run_menu)
+        {
+            run_menu();
+        }
+        else if (b_run_game)
+        {
+            run_game();
+        }
+    }
 
     // Nettoyer et quitter
     if (physicsEngine)

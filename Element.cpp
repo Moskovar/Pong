@@ -205,9 +205,36 @@ void Element::turn(GLfloat yaw)//et le deltatime ??
 	//std::cout << this->yaw << std::endl;
 }
 
-void Element::fall(GLfloat deltaTime)
+void Element::turn(GLfloat yaw, glm::vec3 axes)//normaliser awes.x y et z ?? 
 {
-	translate(glm::vec3(0.0f, -FALL_SPEED * deltaTime, 0.0f));
+	rotations.x = yaw * axes.x;
+	if		(rotations.x > 360) rotations.x -= 360;
+	else if (rotations.x < 360) rotations.x += 360;
+
+	rotations.y += yaw * axes.y;
+	if		(rotations.y > 360) rotations.y -= 360;
+	else if (rotations.y < 360) rotations.y += 360;
+
+	rotations.z += yaw * axes.z;
+	if		(rotations.z > 360) rotations.z -= 360;
+	else if (rotations.z < 360) rotations.z += 360;
+
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(yaw), axes);
+	updatePosition();
+}
+
+void Element::resetRotations()
+{
+	std::cout << "Reset rotations" << std::endl;
+
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotations.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotations.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotations.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+	rotations.x = 0.0f;
+	rotations.y = 0.0f;
+	rotations.z = 0.0f;
+
 	updatePosition();
 }
 
@@ -254,8 +281,6 @@ void Element::updateModelMatrixFromPosition()
 
 	calculateHitBox();
 }
-
-
 
 void Element::clear()
 {

@@ -34,7 +34,6 @@ public:
 	glm::vec3	getRotations()		{ return rotations;			}
 
 	glm::mat4	getAnticipatedMove(GLfloat deltaTime);
-	glm::mat4   getAnticipatedFall(GLfloat deltaTime);
 	OBB			getAnticipatedMoveHitbox(GLfloat deltaTime);
 	OBB			getOBBAtPos(glm::vec3 pos);
 	OBB			getAnticipatedFallHitbox(GLfloat deltaTime);
@@ -57,9 +56,9 @@ public:
 	void moveAtZ(GLfloat positionZ);
 	void translate(glm::vec3 translation);
 	void turn(GLfloat yaw);
-	void turn(GLfloat yaw, glm::vec3 axes);
+	void turn(GLfloat yaw, glm::vec3 axes, bool recalculateHitbox = true);
 	void resetRotations();
-	void updatePosition();
+	void updatePosition(bool recalculateHitbox = true);
 	void updateModelMatrixFromPosition();
 
 	void clear();

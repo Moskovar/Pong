@@ -205,11 +205,13 @@ void Element::turn(GLfloat yaw)//et le deltatime ??
 	//std::cout << this->yaw << std::endl;
 }
 
-void Element::turn(GLfloat yaw, glm::vec3 axes)//normaliser awes.x y et z ?? 
+void Element::turn(GLfloat yaw, glm::vec3 axes, bool recalculateHitbox)//normaliser awes.x y et z ?? 
 {
-	rotations.x = yaw * axes.x;
+	rotations.x += yaw * axes.x;
 	if		(rotations.x > 360) rotations.x -= 360;
 	else if (rotations.x < 360) rotations.x += 360;
+
+	std::cout << rotations.x << std::endl;
 
 	rotations.y += yaw * axes.y;
 	if		(rotations.y > 360) rotations.y -= 360;
@@ -220,16 +222,16 @@ void Element::turn(GLfloat yaw, glm::vec3 axes)//normaliser awes.x y et z ??
 	else if (rotations.z < 360) rotations.z += 360;
 
 	modelMatrix = glm::rotate(modelMatrix, glm::radians(yaw), axes);
-	updatePosition();
+	updatePosition(recalculateHitbox);
 }
 
 void Element::resetRotations()
 {
 	std::cout << "Reset rotations" << std::endl;
 
-	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotations.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotations.y), glm::vec3(0.0f, 1.0f, 0.0f));
-	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotations.z), glm::vec3(0.0f, 0.0f, 1.0f));
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(-rotations.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(-rotations.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelMatrix = glm::rotate(modelMatrix, glm::radians(-rotations.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
 	rotations.x = 0.0f;
 	rotations.y = 0.0f;
@@ -264,13 +266,13 @@ void Element::calculateHitBox()
 }
 
 
-void Element::updatePosition()
+void Element::updatePosition(bool recalculateHitbox)
 {
 	this->position.x = this->modelMatrix[3].x;
 	this->position.y = this->modelMatrix[3].y;
 	this->position.z = this->modelMatrix[3].z;
 
-	calculateHitBox();
+	if(recalculateHitbox) calculateHitBox();
 }
 
 void Element::updateModelMatrixFromPosition()

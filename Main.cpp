@@ -32,9 +32,13 @@ glm::mat4   projection;
 std::map<std::string, Shader>   shaders;
 std::map<char, bool>            keyPressed;
 std::map<int, bool>             mousePressed;
+std::map<Element*, bool>        menu_buttons_pressed;
 
 std::vector<Player*> players;
 std::vector<Element> walls;
+
+//--- Menu ---//
+Element* play = nullptr;
 
 GLboolean b_run = true, b_run_menu = true, b_run_game = false;
 
@@ -65,6 +69,12 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     else if (action == GLFW_RELEASE)
     {
         mousePressed[button] = false;
+
+        if (menu_buttons_pressed[play])
+        {
+            b_run_menu = false;
+            b_run_game = true;
+        }
     }
 }
 
@@ -270,7 +280,9 @@ void receive_data_tcp()
 
 void run_menu()
 {
-    Element play(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/play_fr.fbx");
+    play = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/play_fr.fbx");
+
+    menu_buttons_pressed[play] = false;
 
     auto    startTime = std::chrono::high_resolution_clock::now();
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
@@ -293,25 +305,27 @@ void run_menu()
 
         //std::cout << "WorldPos: " << worldPos.z << std::endl;
 
-        bool inPlay = isPointInOBB(worldPos, play.getRHitbox());
+        bool inPlay = isPointInOBB(worldPos, play->getRHitbox());
 
-        if (inPlay && play.getRotations().x > -25)
+        if (inPlay && play->getRotations().x == 0.0f)
         {
             //std::cout << "PLAY" << std::endl;
-            play.turn(-25, glm::vec3(1.0f, 0.0f, 0.0f));
+            play->turn(-25, glm::vec3(1.0f, 0.0f, 0.0f), false);
+            menu_buttons_pressed[play] = true;
             //b_run_menu = false;
             //b_run_game = true;
         }
-        else if(!inPlay && play.getRotations().x != 0.0f)
+        else if(!inPlay && play->getRotations().x != 0.0f)
         {
-            play.resetRotations();
+            play->resetRotations();
+            menu_buttons_pressed[play] = false;
         }
 
         // Effacer le buffer de couleur et de profondeur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shaders["AnimatedObject"].use();
-        play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        play->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();
@@ -322,6 +336,12 @@ void run_menu()
     }
 
     b_run_menu = false;//mettre à false pour si on press escape -> glfwWindowShouldClose
+
+    if (play)
+    {
+        delete play;
+        play = nullptr;
+    }
 }
 
 void run_game()

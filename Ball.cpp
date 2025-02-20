@@ -41,6 +41,7 @@ void Ball::updateInterpolate(NetworkBall& nball)
 
 	this->velocityX = (float)(nball.velocityX / 1000.0f);
 	this->velocityZ = (float)(nball.velocityZ / 1000.0f);
+	this->moveSpeed = nball.speed;
 
 	//std::cout << "BALL UPDATED: " << this->position.x << " : " << this->position.z << " : " << this->velocityX << " : " << this->velocityZ << std::endl;
 }

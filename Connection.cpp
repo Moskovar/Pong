@@ -79,7 +79,7 @@ Connection::~Connection()
 //    }
 //}
 
-short Connection::recvTCP(NetworkBall& nball, NetworkBallSpeed& nbs, GLboolean& run)
+short Connection::recvTCP(NetworkBall& nball, GLboolean& run)
 {
     int bytesReceived = 0;
     int totalReceived = 0;
@@ -120,11 +120,11 @@ short Connection::recvTCP(NetworkBall& nball, NetworkBallSpeed& nbs, GLboolean& 
         //std::cout << "Header " << header << " received" << std::endl;
         dataSize = sizeof(NetworkBall);
     }
-    else if (header == Header::BALLSPEED)
-    {
-        //std::cout << "Header " << header << " received" << std::endl;
-        dataSize = sizeof(NetworkBallSpeed);
-    }
+    //else if (header == Header::BALLSPEED)
+    //{
+    //    //std::cout << "Header " << header << " received" << std::endl;
+    //    dataSize = sizeof(NetworkBallSpeed);
+    //}
     else
     {
         std::cout << "Wrong TCP message, NBALL was expected: " << header << " has been received..." << std::endl;
@@ -166,18 +166,18 @@ short Connection::recvTCP(NetworkBall& nball, NetworkBallSpeed& nbs, GLboolean& 
         nball.velocityZ = ntohl(nball.velocityZ);
         nball.timestamp = ntohl(nball.timestamp);
 
-        std::cout << "TCP BALL: " << (float)(nball.x / 1000.0f) << " : " << (float)(nball.z / 1000.0f) << " : " << (float)(nball.velocityX / 1000.0f) << " : " << (float)(nball.velocityZ / 1000.0f) << std::endl;
+        //std::cout << "TCP BALL: " << (float)(nball.x / 1000.0f) << " : " << (float)(nball.z / 1000.0f) << " : " << (float)(nball.velocityX / 1000.0f) << " : " << (float)(nball.velocityZ / 1000.0f) << " -> " << nball.timestamp << std::endl;
     }
-    else if (header == Header::BALLSPEED)
-    {
-        // Copier les données reçues (y compris le header) dans la structure NetworkEntity
-        std::memcpy(&nbs, buffer, dataSize);
+    //else if (header == Header::BALLSPEED)
+    //{
+    //    // Copier les données reçues (y compris le header) dans la structure NetworkEntity
+    //    std::memcpy(&nbs, buffer, dataSize);
 
-        // Convertir les champs en endian correct si nécessaire
-        nbs.speed = ntohs(nbs.speed);
+    //    // Convertir les champs en endian correct si nécessaire
+    //    nbs.speed = ntohs(nbs.speed);
 
-        std::cout << "TCP BALLSPEED: " << nbs.speed << std::endl;
-    }
+    //    //std::cout << "TCP BALLSPEED: " << nbs.speed << std::endl;
+    //}
 
     return header;
 }
@@ -409,8 +409,9 @@ short Connection::recvUDP(NetworkPaddle& np, NetworkBall& nb)
             nb.z            = ntohl(nb.z);
             nb.velocityX    = ntohl(nb.velocityX);
             nb.velocityZ    = ntohl(nb.velocityZ);
+            nb.speed        = ntohs(nb.speed);
             nb.timestamp    = ntohl(nb.timestamp);
-            //std::cout << "[UDP] Ball reçue: x=" << (float)(nb.x / 1000.0f) << ", z=" << (float)(nb.z / 1000.0f) << " velocityX: " << (float)(nb.velocityX / 1000.0f) << " velocityZ: " << (float)(nb.velocityZ / 1000.0f) << " :: " << nb.timestamp << std::endl;
+            //std::cout << "[UDP] Ball reçue: x=" << (float)(nb.x / 1000.0f) << ", z=" << (float)(nb.z / 1000.0f) << " velocityX: " << (float)(nb.velocityX / 1000.0f) << " velocityZ: " << (float)(nb.velocityZ / 1000.0f) << " -> " << nb.timestamp << std::endl;
             return Header::BALL;
         }
     }

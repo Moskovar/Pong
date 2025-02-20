@@ -243,13 +243,11 @@ void receive_data_udp()
 void receive_data_tcp()
 {
     NetworkBall nball;
-    NetworkBallSpeed nbs;
-
     short header = 0;
 
     while (run)
     {
-        header = co.recvTCP(nball, nbs, run);
+        header = co.recvTCP(nball, run);
         if(header == Header::BALL)
         {
             //mtx.lock();
@@ -261,11 +259,6 @@ void receive_data_tcp()
             }
             else std::cout << "BALL nullptr" << std::endl;
             //mtx.unlock();
-        }
-        else if (header == Header::BALLSPEED)
-        {
-            ball->setMoveSpeed(nbs.speed);
-            std::cout << "BALL SPEED IS NOW AT: " << ball->getMoveSpeed() << std::endl;
         }
     }
 }
@@ -348,6 +341,8 @@ int main()
 
         glm::vec3 worldPos;
         findRayIntersectionWithMap(camera->getPosition(), generateRayFromCursor(glfwWindow), worldPos);
+
+        //std::cout << "WorldPos: " << worldPos.z << std::endl;
 
         if (players[0])
         {

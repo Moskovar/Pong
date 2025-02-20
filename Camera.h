@@ -30,6 +30,14 @@ class Camera
 		void update();
 		void updateViewMatrix();
 
+		void setSide(GLfloat side)
+		{
+			if (side != -1 && side != 1) return;
+
+			// La caméra regarde toujours vers le bas, donc pas besoin de calculer front et right
+			this->viewMatrix = glm::lookAt(this->position, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, side));
+		}
+
 	private:
 		glm::mat4  viewMatrix;
 		glm::vec3  position, front, right;

@@ -263,6 +263,8 @@ void receive_data_tcp()
     }
 }
 
+void run_game();
+
 int main()
 {
 	std::cout << "Hello Pong !" << std::endl;
@@ -321,6 +323,8 @@ int main()
 
     players.push_back(new Player(nps1.gameID, nps1.id, nps1.side));
     players.push_back(new Player(nps2.gameID, nps2.id, nps2.side));
+
+    camera->setSide(players[0]->getSide());
 
     ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
 

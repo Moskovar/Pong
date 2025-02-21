@@ -504,10 +504,6 @@ void run_game()
     std::cout << "La partie se lance..." << std::endl;
 
     //--- Chargement du jeu ---// //créer un chargement après que la game soit créée
-    //bool runt = true;
-    //NetworkPaddleStart nps1, nps2;
-    //co.recvNPSTCP(nps1, runt);
-    //co.recvNPSTCP(nps2, runt);
 
     while (nps_players.size() != 2);
 
@@ -623,6 +619,8 @@ void run_game()
     t_receive_data_udp.join();
 
     clearPlayers();
+
+    camera->setSide(-1.0f);
 
     b_run_menu = true;
 }

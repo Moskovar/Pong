@@ -103,7 +103,12 @@ extern std::map <int, std::string>	gl_textures_string;
 
 extern std::map<std::string, int> animationIDs;
 
-
+enum MENUBUTTON
+{
+	WARMUP,
+	PLAY,
+	LEAVE_MM
+};
 
 //--- Network ---//
 enum Header 

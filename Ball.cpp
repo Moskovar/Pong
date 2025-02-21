@@ -27,6 +27,14 @@ void Ball::turnBack()//useless?
 	velocityX *= -1;
 }
 
+void Ball::reset()
+{
+	this->position	= glm::vec3(0.0f, 0.0f, 0.0f);
+	this->velocityX = 0.0f;
+	this->velocityZ = 0.0f;
+	this->moveSpeed = 50;
+}
+
 void Ball::updateInterpolate(NetworkBall& nball)
 {
 	glm::vec3 targetBallPos = glm::vec3((float)(nball.x / 1000.0f), 0.0f, (float)(nball.z / 1000.0f));

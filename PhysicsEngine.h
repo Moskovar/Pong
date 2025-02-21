@@ -10,6 +10,7 @@ class PhysicsEngine
 		GLfloat distanceBetweenHitboxes(Element* e1, Element* e2);
 		
 		void run(GLfloat& deltaTime);
+		void runWarmup(GLfloat& deltaTime);
 
 	private:
 		std::vector<Player*>*	players		= nullptr;

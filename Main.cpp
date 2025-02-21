@@ -32,7 +32,6 @@ glm::mat4   projection;
 std::map<std::string, Shader>   shaders;
 std::map<char, bool>            keyPressed;
 std::map<int, bool>             mousePressed;
-std::map<Element*, bool>        menu_buttons_hovered;
 
 std::vector<Player*> players;
 std::vector<NetworkPaddleStart> nps_players;//pour récupérer les données relatives aux joueurs dans un thread secondaire, en dehors du contexte openGL
@@ -41,9 +40,25 @@ std::vector<Element> walls;
 std::thread* t_receive_data_tcp = nullptr;
 
 //--- Menu ---//
-Element* play = nullptr, * leave_mm = nullptr;
+//Element* play = nullptr, * leave_mm = nullptr, * warmup = nullptr;
+std::map<short   , Element*> menu_buttons;//contient les boutons du menu, retrouvable à partir de l'enum MENUBUTTON dans uti.hpp
+std::map<Element*, bool>     menu_buttons_hovered;//lie chaque bouton du menu à un état "survolé", permet de gérer le clique
 
-GLboolean b_run = true, b_run_menu = true, b_run_game = false, b_run_matchmaking = false;
+GLboolean b_run = true, b_run_menu = true, b_run_game = false, b_run_matchmaking = false, b_run_warmup = false;
+
+void clearPlayers()
+{
+    for (auto it = players.begin(); it != players.end();)
+    {
+        if (*it)
+        {
+            delete* it;
+            *it = nullptr;
+        }
+
+        it = players.erase(it);
+    }
+}
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -54,8 +69,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
         switch (key)
         {
             case GLFW_KEY_ESCAPE:   
-                glfwSetWindowShouldClose(window, true);
-                if (b_run_menu) b_run = false;
+                if (b_run_menu)
+                {
+                    b_run_menu  = false;
+                    b_run       = false;
+                }
+                else if (b_run_warmup)  b_run_warmup    = false;
+                else if (b_run_game)    b_run_game      = false;
                 break;
             case GLFW_KEY_Q:        /*co.sendNSTCP({Header::SPELL, SpellID::GRAVITY});*/ break;
         }
@@ -73,13 +93,18 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     {
         mousePressed[button] = false;
 
-        if (menu_buttons_hovered[play])
+        if (menu_buttons_hovered[menu_buttons[MENUBUTTON::PLAY]])
         {
             co.sendMatchmakingTCP();
 
             b_run_matchmaking = !b_run_matchmaking;
             if (b_run_matchmaking) std::cout << "Waiting for matchmaking..." << std::endl;
             else std::cout << "You left the matchmaking..." << std::endl;
+        }
+        else if (menu_buttons_hovered[menu_buttons[MENUBUTTON::WARMUP]])
+        {
+            b_run_menu = false;
+            b_run_warmup = true;
         }
     }
 }
@@ -300,8 +325,13 @@ void receive_data_tcp()
 void run_menu()
 {    
     system("cls");
-    menu_buttons_hovered[play]      = false;
-    menu_buttons_hovered[leave_mm]  = false;
+
+    ball->reset();
+
+    for (auto it = menu_buttons_hovered.begin(); it != menu_buttons_hovered.end(); ++it)
+    {
+        it->second = false;
+    }
 
     auto    startTime = std::chrono::high_resolution_clock::now();
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
@@ -309,7 +339,7 @@ void run_menu()
 
     GLFWwindow* glfwWindow = window->getGLFWWindow();
 
-    while (!glfwWindowShouldClose(glfwWindow) && b_run_menu)
+    while (b_run_menu)
     {
         mtx_players.lock();
         if (nps_players.size() == 2)
@@ -336,42 +366,30 @@ void run_menu()
         //std::cout << "WorldPos: " << worldPos.z << std::endl;
 
         //--- Gestion du bouton play ---//
-        bool inPlay = false;
+        bool inButton = false;
         Element* button = nullptr;
-        if (!b_run_matchmaking)
-        {
-            inPlay = isPointInOBB(worldPos, play->getRHitbox());
-            button = play;
-        }
-        else//si on est dans le matchmaking
-        {
-            //si les 2 joueurs on était reçu du serveur on peut lancer la partie (on modifie les bool depuis le thread principal pour éviter les conflits)
-            //mtx_players.lock();
-            //if (players.size() == 2)
-            //{
-            //    b_run_matchmaking   = false;
-            //    b_run_menu          = false;
-            //    b_run_game          = true;
 
-            //    mtx_players.unlock();
-            //    return;//on sort
-            //}
-            //mtx_players.unlock();
+        for (auto it = menu_buttons.begin(); it != menu_buttons.end(); ++it)
+        {
+            button = it->second;
+            inButton = isPointInOBB(worldPos, button->getRHitbox());
 
-            inPlay = isPointInOBB(worldPos, leave_mm->getRHitbox());
-            button = leave_mm;
+
+            if (inButton)
+            {
+                if (button->getRotations().x != 0.0f) continue;//si rotation déjà effectuée, c'est qu'on est déjà dessus donc on sort
+
+                menu_buttons_hovered[button] = true;
+                button->turn(-25, glm::vec3(1.0f, 0.0f, 0.0f), false);
+                continue;
+            }
+            else if(button->getRotations().x != 0.0f)
+            {
+                button->resetRotations();
+                menu_buttons_hovered[button] = false;
+            }
         }
 
-        if (inPlay && button->getRotations().x == 0.0f)
-        {
-            button->turn(-25, glm::vec3(1.0f, 0.0f, 0.0f), false);
-            menu_buttons_hovered[button] = true;
-        }
-        else if (!inPlay && button->getRotations().x != 0.0f)
-        {
-            button->resetRotations();
-            menu_buttons_hovered[button] = false;
-        }
         ///--- Fin gestion bouton play ---//
         
 
@@ -379,8 +397,94 @@ void run_menu()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shaders["AnimatedObject"].use();
-        if(!b_run_matchmaking)  play->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
-        else                    leave_mm->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        if(!b_run_matchmaking)  menu_buttons[MENUBUTTON::PLAY]->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        else                    menu_buttons[MENUBUTTON::LEAVE_MM]->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        menu_buttons[MENUBUTTON::WARMUP]->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
+        window->resetXYChange();
+
+        //Swap buffers
+        glfwSwapBuffers(glfwWindow);
+        glfwPollEvents();
+    }
+}
+
+void run_warmup()
+{
+    std::cout << "Warmup is starting.." << std::endl;
+
+    players.push_back(new Player(0, 0,  1));
+    players.push_back(new Player(0, 0, -1));
+
+    ball->setVelocityX(1.0f);
+    ball->setMoveSpeed(50.0f);
+
+    //--- Fin chargement jeu ---//
+
+    auto    startTime = std::chrono::high_resolution_clock::now();
+    float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
+            lastFrame = glfwGetTime(), deltaTime = 0, now = 0;
+
+    GLFWwindow* glfwWindow = window->getGLFWWindow();
+
+    while (b_run_warmup)
+    {
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        timeSinceStart = std::chrono::duration<float>(currentTime - startTime).count();
+
+        //DeltaTime
+        now = glfwGetTime();
+        deltaTime = now - lastFrame;
+        lastFrame = now;
+
+        glm::vec3 worldPos;
+        findRayIntersectionWithMap(camera->getPosition(), generateRayFromCursor(glfwWindow), worldPos);
+
+        //std::cout << "WorldPos: " << worldPos.z << std::endl;
+
+        if (players[0] && players[1])
+        {
+            glm::vec3 wpos = players[0]->getPaddle()->getPosition();
+            wpos.z = worldPos.z;
+
+            OBB obb2 = players[0]->getPaddle()->getOBBAtPos(wpos);
+
+            for (Element& wall : walls)
+            {
+                if (distanceBetweenHitboxes(obb2, wall.getRHitbox()) == 0)
+                {
+                    OBB wallOBB = wall.getRHitbox();
+                    worldPos.z = (worldPos.z > 0) ? wallOBB.center.z - wallOBB.halfSize.z - players[0]->getPaddle()->getWidth() / 2.0f //pour les obstacles > 0
+                        : wallOBB.center.z + wallOBB.halfSize.z + players[0]->getPaddle()->getWidth() / 2.0f;//pour les obstacles < 0 
+                    break;
+                }
+            }
+
+            GLfloat z = players[0]->getPaddle()->getPosition().z;
+            players[0]->getPaddle()->setPositionZ(worldPos.z);
+            players[1]->getPaddle()->setPositionZ(worldPos.z);
+        }
+
+        // Effacer le buffer de couleur et de profondeur
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //Draw
+        shaders["AnimatedObject"].use();
+        mtx_players.lock();
+        for (Player* p : players)
+            p->getPaddle()->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        mtx_players.unlock();
+
+        ball->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        for (Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        //play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        physicsEngine->runWarmup(deltaTime);
+        //ball->move(deltaTime);
 
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();
@@ -390,7 +494,9 @@ void run_menu()
         glfwPollEvents();
     }
 
-    b_run_menu = false;//mettre à false pour si on press escape -> glfwWindowShouldClose
+    clearPlayers();
+
+    b_run_menu      = true;
 }
 
 void run_game()
@@ -407,6 +513,8 @@ void run_game()
 
     players.push_back(new Player(nps_players[0].gameID, nps_players[0].id, nps_players[0].side));
     players.push_back(new Player(nps_players[1].gameID, nps_players[1].id, nps_players[1].side));
+
+    nps_players.clear();//une fois les joueur créées, on peut delete les nps
 
     if (players.size() != 2) return;
 
@@ -434,7 +542,7 @@ void run_game()
 
     GLFWwindow* glfwWindow = window->getGLFWWindow();
 
-    while (!glfwWindowShouldClose(glfwWindow) && b_run_game)
+    while (b_run_game)
     {
         auto currentTime = std::chrono::high_resolution_clock::now();
         timeSinceStart = std::chrono::duration<float>(currentTime - startTime).count();
@@ -512,11 +620,11 @@ void run_game()
         glfwPollEvents();
     }
 
-    b_run       = false;
-    b_run_game  = false;
-
     t_receive_data_udp.join();
-    //t_receive_data_tcp.join();
+
+    clearPlayers();
+
+    b_run_menu = true;
 }
 
 int main()
@@ -549,8 +657,9 @@ int main()
     //--- Chargement des shaders ---//
     shaders["AnimatedObject"] = Shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", view, &projection);
 
-    play        = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/play.fbx");
-    leave_mm    = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/leave_mm.fbx");
+    menu_buttons[MENUBUTTON::WARMUP]    = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/warmup.fbx");
+    menu_buttons[MENUBUTTON::PLAY]      = new Element(0, glm::vec3(0.0f, 0.0f, -10.0f), "models/fbx/menu/fr/play.fbx");
+    menu_buttons[MENUBUTTON::LEAVE_MM]  = new Element(0, glm::vec3(0.0f, 0.0f, -10.0f), "models/fbx/menu/fr/leave_mm.fbx");
 
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
     walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, 40.0f), "models/fbx/wall.fbx"));
@@ -574,6 +683,10 @@ int main()
         else if (b_run_game)
         {
             run_game();
+        }
+        else if (b_run_warmup)
+        {
+            run_warmup();
         }
     }
 
@@ -606,16 +719,13 @@ int main()
         ball = nullptr;
     }
 
-    if (play)//charger au lancement et décharger à la fermeture
+    for (auto it = menu_buttons.begin(); it != menu_buttons.end(); ++it)
     {
-        delete play;
-        play = nullptr;
-    }
-
-    if (leave_mm)
-    {
-        delete leave_mm;
-        leave_mm = nullptr;
+        if (it->second)
+        {
+            delete it->second;
+            it->second = nullptr;
+        }
     }
 
     if (window)

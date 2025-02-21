@@ -170,3 +170,105 @@ void PhysicsEngine::run(GLfloat& deltaTime)
     }
     mtx_ball->unlock();
 }
+
+void PhysicsEngine::runWarmup(GLfloat& deltaTime)
+{
+    float distance;
+    Element* element = nullptr;
+    short isPaddle = true;//pour vérifier le type d'Element, plus rapide qu'un dynamic cast ?
+
+    Player* p1 = ((*players)[0]->getSide() == -1) ? (*players)[0] : (*players)[1], * p2 = ((*players)[1]->getSide() == 1) ? (*players)[1] : (*players)[0];
+
+    if (ball->getVelocityX() < 0 && p1)
+    {
+        element = p1->getPaddle();
+
+        if (!element)
+        {
+            return;
+        }
+
+        //std::cout << "P1" << std::endl;
+
+        if (ball->getX() < element->getX() - 10)
+        {
+            std::cout << "OUT! P1" << std::endl;
+            ball->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+            ball->setVelocityZ(0.0f);
+            return;
+        }
+    }
+    else if (ball->getVelocityX() > 0 && p2)
+    {
+        element = p2->getPaddle();
+
+        if (!element)
+        {
+            return;
+        }
+
+        //std::cout << "P2" << std::endl;
+
+        if (ball->getX() > element->getX() + 10)
+        {
+            std::cout << "OUT! P2" << std::endl;
+            ball->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+            ball->setVelocityZ(0.0f);
+            return;
+        }
+    }
+    //else return;
+
+    if (!element)
+    {
+        return;
+    }
+
+    distance = distanceBetweenHitboxes(ball, element);
+
+    //std::cout << distance << std::endl;
+
+    //Si la distance avec le joueur est > 0, alors on vérifie la distance avec les murs
+    if (distance > 0)
+    {
+        for (Element& wall : *walls)
+        {
+            distance = distanceBetweenHitboxes(&wall, ball);
+
+            if (distance == 0)//Si distance avec le mur == 0, on sort
+            {
+                element = &wall;
+                isPaddle = false;//passe à un si on est au contact d'un wall, sinon reste à 0
+                break;
+            }
+        }
+    }
+
+    //Si la distance avec le dernier élément comparé est > 0, on déplace la balle, sinon on traite la collision en fonction de l'élément
+    if (distance > 0 || ball->getLastElementHit() == element)
+    {
+        ball->move(deltaTime);
+    }
+    else
+    {
+        if (isPaddle)
+        {
+            std::cout << "COLLISION AVEC PADDLE" << std::endl;
+
+            //---- VelocityX ---//
+            ball->turnBack();
+
+            //--- VelocityZ ---//
+            float velocityZ = (ball->getZ() - element->getZ()) / (static_cast<Paddle*>(element)->getWidth() / 2);
+
+
+            ball->setVelocityZ(velocityZ);
+        }
+        else
+        {
+            ball->setVelocityZ(-ball->getVelocityZ());
+        }
+
+        ball->setLastElementHit(element);
+    }
+}

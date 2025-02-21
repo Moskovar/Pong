@@ -19,6 +19,7 @@ class Ball : public Element
 
 		void move(GLfloat deltaTime);
 		void turnBack();
+		void reset();
 
 		void updateInterpolate(NetworkBall& nball);
 		void update(NetworkBall& nball);

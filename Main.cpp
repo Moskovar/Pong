@@ -19,7 +19,7 @@ GLfloat width = 1920.0f, height = 1080.0f;
 
 Connection co;
 
-std::mutex mtx, mtx_ball;
+std::mutex mtx, mtx_ball, mtx_players;
 
 Window*         window          = nullptr;
 Camera*         camera          = nullptr;
@@ -35,7 +35,10 @@ std::map<int, bool>             mousePressed;
 std::map<Element*, bool>        menu_buttons_hovered;
 
 std::vector<Player*> players;
+std::vector<NetworkPaddleStart> nps_players;//pour récupérer les données relatives aux joueurs dans un thread secondaire, en dehors du contexte openGL
 std::vector<Element> walls;
+
+std::thread* t_receive_data_tcp = nullptr;
 
 //--- Menu ---//
 Element* play = nullptr, * leave_mm = nullptr;
@@ -75,7 +78,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
             co.sendMatchmakingTCP();
 
             b_run_matchmaking = !b_run_matchmaking;
-            std::cout << b_run_matchmaking << std::endl;
+            if (b_run_matchmaking) std::cout << "Waiting for matchmaking..." << std::endl;
+            else std::cout << "You left the matchmaking..." << std::endl;
         }
     }
 }
@@ -260,11 +264,12 @@ void receive_data_udp()
 void receive_data_tcp()
 {
     NetworkBall nball;
+    NetworkPaddleStart nps;
     short header = 0;
 
-    while (b_run_game)
+    while (b_run)
     {
-        header = co.recvTCP(nball, b_run_game);
+        header = co.recvTCP(nball, nps, b_run_game);
         if(header == Header::BALL)
         {
             //mtx.lock();
@@ -277,11 +282,24 @@ void receive_data_tcp()
             else std::cout << "BALL nullptr" << std::endl;
             //mtx.unlock();
         }
+        else if (header == Header::NPS)//réception des joueurs lors de la création de la partie
+        {
+            if (players.size() < 2)
+            {
+                mtx_players.lock();
+                //players.push_back(new Player(nps.gameID, nps.id, nps.side));
+                nps_players.push_back(nps);
+                std::cout << "||--- Player added to the game ---||" << std::endl;
+                mtx_players.unlock();
+            }
+            else std::cout << "A player has been received, but there are already 2 players in the game..." << std::endl;
+        }
     }
 }
 
 void run_menu()
 {    
+    system("cls");
     menu_buttons_hovered[play]      = false;
     menu_buttons_hovered[leave_mm]  = false;
 
@@ -293,6 +311,17 @@ void run_menu()
 
     while (!glfwWindowShouldClose(glfwWindow) && b_run_menu)
     {
+        mtx_players.lock();
+        if (nps_players.size() == 2)
+        {
+            b_run_matchmaking   = false;
+            b_run_menu          = false;
+            b_run_game          = true;
+            mtx_players.unlock();
+            continue;
+        }
+        mtx_players.unlock();
+
         auto currentTime = std::chrono::high_resolution_clock::now();
         timeSinceStart = std::chrono::duration<float>(currentTime - startTime).count();
 
@@ -314,8 +343,21 @@ void run_menu()
             inPlay = isPointInOBB(worldPos, play->getRHitbox());
             button = play;
         }
-        else
+        else//si on est dans le matchmaking
         {
+            //si les 2 joueurs on était reçu du serveur on peut lancer la partie (on modifie les bool depuis le thread principal pour éviter les conflits)
+            //mtx_players.lock();
+            //if (players.size() == 2)
+            //{
+            //    b_run_matchmaking   = false;
+            //    b_run_menu          = false;
+            //    b_run_game          = true;
+
+            //    mtx_players.unlock();
+            //    return;//on sort
+            //}
+            //mtx_players.unlock();
+
             inPlay = isPointInOBB(worldPos, leave_mm->getRHitbox());
             button = leave_mm;
         }
@@ -353,19 +395,23 @@ void run_menu()
 
 void run_game()
 {
+    std::cout << "La partie se lance..." << std::endl;
+
     //--- Chargement du jeu ---// //créer un chargement après que la game soit créée
-    std::cout << "Waiting for matchmaking..." << std::endl;
+    //bool runt = true;
+    //NetworkPaddleStart nps1, nps2;
+    //co.recvNPSTCP(nps1, runt);
+    //co.recvNPSTCP(nps2, runt);
 
-    bool runt = true;
-    NetworkPaddleStart nps1, nps2;
-    co.recvNPSTCP(nps1, runt);
-    co.recvNPSTCP(nps2, runt);
+    while (nps_players.size() != 2);
 
-    std::thread t_receive_data_udp(receive_data_udp);
-    std::thread t_receive_data_tcp(receive_data_tcp);
+    players.push_back(new Player(nps_players[0].gameID, nps_players[0].id, nps_players[0].side));
+    players.push_back(new Player(nps_players[1].gameID, nps_players[1].id, nps_players[1].side));
 
-    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
-    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, 40.0f), "models/fbx/wall.fbx"));
+    if (players.size() != 2) return;
+
+    if (!players[0]->getPaddle()) std::cout << "Paddle 0 nullptr" << std::endl;
+    if (!players[1]->getPaddle()) std::cout << "Paddle 1 nullptr" << std::endl;
 
     //std::cout << "MINPOINT: " << walls[0].getRHitbox().minPoint.x << " : " << walls[0].getRHitbox().minPoint.y << " : " << walls[0].getRHitbox().minPoint.z << std::endl;
     //std::cout << "MAXPOINT: " << walls[0].getRHitbox().maxPoint.x << " : " << walls[0].getRHitbox().maxPoint.y << " : " << walls[0].getRHitbox().maxPoint.z << std::endl;
@@ -373,14 +419,13 @@ void run_game()
     //std::cout << "MAXPOINT: " << walls[1].getRHitbox().maxPoint.x << " : " << walls[1].getRHitbox().maxPoint.y << " : " << walls[1].getRHitbox().maxPoint.z << std::endl;
     //std::cout << "MAXPOINT: " << ball->getRHitbox().maxPoint.x << " : " << ball->getRHitbox().maxPoint.y << " : " << ball->getRHitbox().maxPoint.z << std::endl;
 
-    players.push_back(new Player(nps1.gameID, nps1.id, nps1.side));
-    players.push_back(new Player(nps2.gameID, nps2.id, nps2.side));
-
     camera->setSide(players[0]->getSide());
 
-    ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
+    //vérifier que tout s'est chargé correctement
 
-    physicsEngine = new PhysicsEngine(&players, &walls, ball, &mtx_ball);
+    std::thread t_receive_data_udp(receive_data_udp);
+    //std::thread t_receive_data_tcp(receive_data_tcp);
+
     //--- Fin chargement jeu ---//
 
     auto    startTime = std::chrono::high_resolution_clock::now();
@@ -446,8 +491,10 @@ void run_game()
 
         //Draw
         shaders["AnimatedObject"].use();
+        mtx_players.lock();
         for (Player* p : players)
             p->getPaddle()->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        mtx_players.unlock();
 
         ball->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
         for (Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
@@ -469,7 +516,7 @@ void run_game()
     b_run_game  = false;
 
     t_receive_data_udp.join();
-    t_receive_data_tcp.join();
+    //t_receive_data_tcp.join();
 }
 
 int main()
@@ -505,9 +552,18 @@ int main()
     play        = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/play.fbx");
     leave_mm    = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/leave_mm.fbx");
 
+    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
+    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, 40.0f), "models/fbx/wall.fbx"));
+
+    ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
+
+    physicsEngine = new PhysicsEngine(&players, &walls, ball, &mtx_ball);
+
     // Activer le test de profondeur
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+
+    t_receive_data_tcp = new std::thread(receive_data_tcp);
 
     while (b_run)
     {
@@ -522,6 +578,13 @@ int main()
     }
 
     // Nettoyer et quitter
+    if (t_receive_data_tcp)
+    {
+        t_receive_data_tcp->join();
+        delete t_receive_data_tcp;
+        t_receive_data_tcp = nullptr;
+    }
+
     if (physicsEngine)
     {
         delete physicsEngine;

@@ -32,15 +32,15 @@ glm::mat4   projection;
 std::map<std::string, Shader>   shaders;
 std::map<char, bool>            keyPressed;
 std::map<int, bool>             mousePressed;
-std::map<Element*, bool>        menu_buttons_pressed;
+std::map<Element*, bool>        menu_buttons_hovered;
 
 std::vector<Player*> players;
 std::vector<Element> walls;
 
 //--- Menu ---//
-Element* play = nullptr;
+Element* play = nullptr, * leave_mm = nullptr;
 
-GLboolean b_run = true, b_run_menu = true, b_run_game = false;
+GLboolean b_run = true, b_run_menu = true, b_run_game = false, b_run_matchmaking = false;
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -70,12 +70,12 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     {
         mousePressed[button] = false;
 
-        if (menu_buttons_pressed[play])
+        if (menu_buttons_hovered[play])
         {
             co.sendMatchmakingTCP();
 
-            b_run_menu = false;
-            b_run_game = true;
+            b_run_matchmaking = !b_run_matchmaking;
+            std::cout << b_run_matchmaking << std::endl;
         }
     }
 }
@@ -281,10 +281,9 @@ void receive_data_tcp()
 }
 
 void run_menu()
-{
-    play = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/play_fr.fbx");
-
-    menu_buttons_pressed[play] = false;
+{    
+    menu_buttons_hovered[play]      = false;
+    menu_buttons_hovered[leave_mm]  = false;
 
     auto    startTime = std::chrono::high_resolution_clock::now();
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
@@ -307,27 +306,39 @@ void run_menu()
 
         //std::cout << "WorldPos: " << worldPos.z << std::endl;
 
-        bool inPlay = isPointInOBB(worldPos, play->getRHitbox());
+        //--- Gestion du bouton play ---//
+        bool inPlay = false;
+        Element* button = nullptr;
+        if (!b_run_matchmaking)
+        {
+            inPlay = isPointInOBB(worldPos, play->getRHitbox());
+            button = play;
+        }
+        else
+        {
+            inPlay = isPointInOBB(worldPos, leave_mm->getRHitbox());
+            button = leave_mm;
+        }
 
-        if (inPlay && play->getRotations().x == 0.0f)
+        if (inPlay && button->getRotations().x == 0.0f)
         {
-            //std::cout << "PLAY" << std::endl;
-            play->turn(-25, glm::vec3(1.0f, 0.0f, 0.0f), false);
-            menu_buttons_pressed[play] = true;
-            //b_run_menu = false;
-            //b_run_game = true;
+            button->turn(-25, glm::vec3(1.0f, 0.0f, 0.0f), false);
+            menu_buttons_hovered[button] = true;
         }
-        else if(!inPlay && play->getRotations().x != 0.0f)
+        else if (!inPlay && button->getRotations().x != 0.0f)
         {
-            play->resetRotations();
-            menu_buttons_pressed[play] = false;
+            button->resetRotations();
+            menu_buttons_hovered[button] = false;
         }
+        ///--- Fin gestion bouton play ---//
+        
 
         // Effacer le buffer de couleur et de profondeur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shaders["AnimatedObject"].use();
-        play->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        if(!b_run_matchmaking)  play->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        else                    leave_mm->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();
@@ -338,12 +349,6 @@ void run_menu()
     }
 
     b_run_menu = false;//mettre à false pour si on press escape -> glfwWindowShouldClose
-
-    if (play)
-    {
-        delete play;
-        play = nullptr;
-    }
 }
 
 void run_game()
@@ -497,6 +502,9 @@ int main()
     //--- Chargement des shaders ---//
     shaders["AnimatedObject"] = Shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", view, &projection);
 
+    play        = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/play.fbx");
+    leave_mm    = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/leave_mm.fbx");
+
     // Activer le test de profondeur
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -533,6 +541,18 @@ int main()
     {
         delete ball;
         ball = nullptr;
+    }
+
+    if (play)//charger au lancement et décharger à la fermeture
+    {
+        delete play;
+        play = nullptr;
+    }
+
+    if (leave_mm)
+    {
+        delete leave_mm;
+        leave_mm = nullptr;
     }
 
     if (window)

@@ -211,7 +211,7 @@ void Element::turn(GLfloat yaw, glm::vec3 axes, bool recalculateHitbox)//normali
 	if		(rotations.x > 360) rotations.x -= 360;
 	else if (rotations.x < 360) rotations.x += 360;
 
-	std::cout << rotations.x << std::endl;
+	//std::cout << rotations.x << std::endl;
 
 	rotations.y += yaw * axes.y;
 	if		(rotations.y > 360) rotations.y -= 360;
@@ -227,7 +227,7 @@ void Element::turn(GLfloat yaw, glm::vec3 axes, bool recalculateHitbox)//normali
 
 void Element::resetRotations()
 {
-	std::cout << "Reset rotations" << std::endl;
+	//std::cout << "Reset rotations" << std::endl;
 
 	modelMatrix = glm::rotate(modelMatrix, glm::radians(-rotations.x), glm::vec3(1.0f, 0.0f, 0.0f));
 	modelMatrix = glm::rotate(modelMatrix, glm::radians(-rotations.y), glm::vec3(0.0f, 1.0f, 0.0f));

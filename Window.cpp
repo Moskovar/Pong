@@ -11,15 +11,6 @@ Window::Window(short width, short height)
         exit(0);
     }
 
-    // Créer une fenêtre GLFW
-    window = glfwCreateWindow(width, height, "OpenGL Development", NULL, NULL);
-    if (!window)
-    {
-        std::cerr << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        exit(0);
-    }
-
     //--- Configuration de GFLW ---//
 
     // Définir la version majeure du contexte OpenGL que nous souhaitons utiliser (ici, 3)
@@ -41,8 +32,19 @@ Window::Window(short width, short height)
 
     //--- Fin configuration GLFW  --- //
 
+    // Créer une fenêtre GLFW
+    window = glfwCreateWindow(width, height, "OpenGL Development", NULL, NULL);
+    if (!window)
+    {
+        std::cerr << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        exit(0);
+    }
+
     //On choisit sur quelle feuille on dessine
     glfwMakeContextCurrent(window);
+
+    glViewport(0, 0, width, height);
 
     createCallbacks();
 
@@ -54,6 +56,7 @@ Window::Window(short width, short height)
         std::cerr << "Failed to initialize GLEW: " << glewGetErrorString(err) << std::endl;
         if (window) glfwDestroyWindow(window);
         glfwTerminate();
+        exit(0);
     }
 
     if (!window)

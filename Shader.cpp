@@ -55,7 +55,7 @@ GLuint Shader::compileShader(const char* source, GLenum shaderType)
         if (!success) {
             glGetShaderInfoLog(shader, 512, NULL, infoLog);
             std::cerr << "ERROR::SHADER::COMPILATION_FAILED\n" << infoLog << std::endl;
-        }
+        }   
 
         return shader;
     }

@@ -12,11 +12,11 @@ class Shader
 		GLuint getShaderProgram() { return shaderProgram; }
 		//GLuint getUniformLocation(const char* uniformName) { return glGetUniformLocation(shaderProgram, uniformName); }
 
-		void use();
+		virtual void use();
 
 		GLuint colorLoc = 0, viewLoc = 0, projLoc = 0, modelLoc = 0, bonesTransformsLoc = 0;
 
-	private:
+	protected:
 		GLuint shaderProgram = 0;
 
 		glm::mat4* view = nullptr, *projection = nullptr;

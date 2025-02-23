@@ -114,6 +114,7 @@ enum MENUBUTTON
 enum Header 
 {
 	VERSION,
+	STATE,
 	MATCHMAKING,
 	NPS,
 	NP,
@@ -132,6 +133,14 @@ struct NetworkVersion
 {
 	short header = Header::VERSION;
 	int version = 0;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+struct NetworkState
+{
+	short header = Header::STATE;
+	short inGame = -1;
 };
 #pragma pack(pop)
 

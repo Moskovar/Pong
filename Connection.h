@@ -23,6 +23,7 @@ class Connection
 		void sendMatchmakingTCP();
 		void sendNPUDP(NetworkPaddle& np);
 		void sendNSTCP(NetworkSpell ns);
+		void sendLeaveGameTCP();
 
 		void setWaitingModeTCP(bool wait);
 

@@ -481,6 +481,29 @@ void Connection::sendNSTCP(NetworkSpell ns)
     //std::cout << "Bytes Sent: " << iResult << std::endl;
 }
 
+void Connection::sendLeaveGameTCP()
+{
+    if (tcpSocket == INVALID_SOCKET)
+    {
+        std::cerr << "Invalid TCP socket." << std::endl;
+        return;
+    }
+
+    NetworkState nst;
+    nst.inGame = 0;
+
+    // Convertir en Big-Endian
+    nst.header = htons(nst.header);
+    nst.inGame = htons(nst.inGame);
+
+    int iResult = ::send(tcpSocket, (const char*)&nst, sizeof(nst), 0);
+    if (iResult == SOCKET_ERROR) 
+    {
+        std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+    }
+    //std::cout << "Bytes Sent: " << iResult << std::endl;
+}
+
 void Connection::setWaitingModeTCP(bool wait)
 {
     wait = !wait;//pour que le bool corresponde au mode -> 0 bloquant, 1 non bloquant

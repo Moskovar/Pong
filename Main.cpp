@@ -7,13 +7,14 @@
 
 #include "Window.h"
 #include "Camera.h"
-#include "Shader.h"
+#include "LaserShader.h"
 
 #include "Connection.h"
 #include "PhysicsEngine.h"
 
 #include "Player.h"
 #include "Ball.h"
+#include "SpellBox.h"
 
 GLfloat width = 1920.0f, height = 1080.0f;
 
@@ -29,13 +30,14 @@ Ball*           ball            = nullptr;
 glm::mat4*  view    = nullptr;
 glm::mat4   projection;
 
-std::map<std::string, Shader>   shaders;
+std::map<std::string, Shader*>  shaders;
 std::map<char, bool>            keyPressed;
 std::map<int, bool>             mousePressed;
 
 std::vector<Player*> players;
 std::vector<NetworkPaddleStart> nps_players;//pour récupérer les données relatives aux joueurs dans un thread secondaire, en dehors du contexte openGL
 std::vector<Element> walls;
+SpellBox* spellBox = nullptr;
 
 std::thread* t_receive_data_tcp = nullptr;
 
@@ -45,6 +47,9 @@ std::map<short   , Element*> menu_buttons;//contient les boutons du menu, retrou
 std::map<Element*, bool>     menu_buttons_hovered;//lie chaque bouton du menu à un état "survolé", permet de gérer le clique
 
 GLboolean b_run = true, b_run_menu = true, b_run_game = false, b_run_matchmaking = false, b_run_warmup = false;
+
+//time
+float now;
 
 void clearPlayers()
 {
@@ -58,6 +63,11 @@ void clearPlayers()
 
         it = players.erase(it);
     }
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    glViewport(0, 0, width, height);
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -75,7 +85,11 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                     b_run       = false;
                 }
                 else if (b_run_warmup)  b_run_warmup    = false;
-                else if (b_run_game)    b_run_game      = false;
+                else if (b_run_game)
+                {
+                    co.sendLeaveGameTCP();
+                    b_run_game = false;
+                }
                 break;
             case GLFW_KEY_Q:        /*co.sendNSTCP({Header::SPELL, SpellID::GRAVITY});*/ break;
         }
@@ -324,7 +338,7 @@ void receive_data_tcp()
 
 void run_menu()
 {    
-    system("cls");
+    //system("cls");
 
     ball->reset();
 
@@ -335,10 +349,10 @@ void run_menu()
 
     auto    startTime = std::chrono::high_resolution_clock::now();
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
-            lastFrame = glfwGetTime(), deltaTime = 0, now = 0;
+            lastFrame = glfwGetTime(), deltaTime = 0;
 
     GLFWwindow* glfwWindow = window->getGLFWWindow();
-
+ 
     while (b_run_menu)
     {
         mtx_players.lock();
@@ -396,12 +410,12 @@ void run_menu()
         // Effacer le buffer de couleur et de profondeur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shaders["AnimatedObject"].use();
+        shaders["AnimatedObject"]->use();
 
-        if(!b_run_matchmaking)  menu_buttons[MENUBUTTON::PLAY]->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
-        else                    menu_buttons[MENUBUTTON::LEAVE_MM]->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        if(!b_run_matchmaking)  menu_buttons[MENUBUTTON::PLAY]->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
+        else                    menu_buttons[MENUBUTTON::LEAVE_MM]->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
 
-        menu_buttons[MENUBUTTON::WARMUP]->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        menu_buttons[MENUBUTTON::WARMUP]->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
 
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();
@@ -410,6 +424,13 @@ void run_menu()
         glfwSwapBuffers(glfwWindow);
         glfwPollEvents();
     }
+
+    for (auto it = menu_buttons_hovered.begin(); it != menu_buttons_hovered.end(); ++it)
+    {
+        it->second = false;
+    }
+
+    b_run_matchmaking = false;
 }
 
 void run_warmup()
@@ -426,7 +447,9 @@ void run_warmup()
 
     auto    startTime = std::chrono::high_resolution_clock::now();
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
-            lastFrame = glfwGetTime(), deltaTime = 0, now = 0;
+            lastFrame = glfwGetTime(), deltaTime = 0;
+
+    //dynamic_cast<LaserShader*>(shaders["AnimatedObjectLaser"])->timeValue = &now;
 
     GLFWwindow* glfwWindow = window->getGLFWWindow();
 
@@ -472,16 +495,27 @@ void run_warmup()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //Draw
-        shaders["AnimatedObject"].use();
+        shaders["AnimatedObject"]->use();
         mtx_players.lock();
         for (Player* p : players)
-            p->getPaddle()->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+            p->getPaddle()->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
         mtx_players.unlock();
 
-        ball->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
-        for (Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        ball->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
+
+        spellBox->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
+        spellBox->rotate(5.0, deltaTime);
+
+        glEnable(GL_BLEND); 
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        shaders["AnimatedObjectLaser"]->use();
+        for (Element& wall : walls) wall.render(shaders["AnimatedObjectLaser"]->modelLoc, shaders["AnimatedObjectLaser"]->bonesTransformsLoc);
+        glDisable(GL_BLEND);
 
         //play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+
+        //std::cout << walls[0].getPosition().x << " : " << walls[0].getPosition().y << " : " << walls[0].getPosition().z << std::endl;
+        //std::cout << walls[1].getPosition().x << " : " << walls[1].getPosition().y << " : " << walls[1].getPosition().z << std::endl;
 
         physicsEngine->runWarmup(deltaTime);
         //ball->move(deltaTime);
@@ -534,7 +568,9 @@ void run_game()
 
     auto    startTime = std::chrono::high_resolution_clock::now();
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
-            lastFrame = glfwGetTime(), deltaTime = 0, now = 0;
+            lastFrame = glfwGetTime(), deltaTime = 0;
+
+    //dynamic_cast<LaserShader*>(shaders["AnimatedObjectLaser"])->timeValue = &now;
 
     GLFWwindow* glfwWindow = window->getGLFWWindow();
 
@@ -594,14 +630,16 @@ void run_game()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //Draw
-        shaders["AnimatedObject"].use();
+        shaders["AnimatedObject"]->use();
         mtx_players.lock();
         for (Player* p : players)
-            p->getPaddle()->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+            p->getPaddle()->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
         mtx_players.unlock();
 
-        ball->render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
-        for (Element& wall : walls) wall.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
+        ball->render(shaders["AnimatedObject"]->modelLoc, shaders["AnimatedObject"]->bonesTransformsLoc);
+
+        shaders["AnimatedObjectLaser"]->use();
+        for (Element& wall : walls) wall.render(shaders["AnimatedObjectLaser"]->modelLoc, shaders["AnimatedObjectLaser"]->bonesTransformsLoc);
 
         //play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
@@ -643,6 +681,7 @@ int main()
 
     glfwSetKeyCallback(glfwWindow, keyCallback);
     glfwSetMouseButtonCallback(glfwWindow, mouse_button_callback);  // Clics de souris
+    glfwSetFramebufferSizeCallback(glfwWindow, framebuffer_size_callback);
 
     glm::vec3 target = glm::vec3(0.0, 0.0f, 0.0f);
 
@@ -650,21 +689,24 @@ int main()
     camera = new Camera();
 
     view = camera->getViewMatrixP();
-    projection = glm::perspective(glm::radians(45.0f), width / height, 0.1f, 120.0f);
-
-    //--- Chargement des shaders ---//
-    shaders["AnimatedObject"] = Shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", view, &projection);
+    projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.5f, 120.0f);
 
     menu_buttons[MENUBUTTON::WARMUP]    = new Element(0, glm::vec3(0.0f, 0.0f, -25.0f), "models/fbx/menu/fr/warmup.fbx");
     menu_buttons[MENUBUTTON::PLAY]      = new Element(0, glm::vec3(0.0f, 0.0f, -10.0f), "models/fbx/menu/fr/play.fbx");
     menu_buttons[MENUBUTTON::LEAVE_MM]  = new Element(0, glm::vec3(0.0f, 0.0f, -10.0f), "models/fbx/menu/fr/leave_mm.fbx");
 
-    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.0f), "models/fbx/wall.fbx"));
-    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, 40.0f), "models/fbx/wall.fbx"));
+    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f, -40.5f), "models/fbx/wall.fbx"));
+    walls.push_back(Element(0, glm::vec3(0.0f, 0.0f,  40.5f), "models/fbx/wall.fbx"));
+
+    spellBox = new SpellBox(0, glm::vec3(0.0f, 0.0f, -5.0f), "models/fbx/box.fbx");
+        
+    //--- Chargement des shaders ---//
+    shaders["AnimatedObject"] = new Shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", view, &projection);
+    shaders["AnimatedObjectLaser"] = new LaserShader("shaders/vertex_shader_laser.glsl", "shaders/fragment_shader_laser.glsl", view, &projection, &now, walls[0].getPositionP());
 
     ball = new Ball(0, glm::vec3(0.0f, 0.0f, 0.0f), "models/fbx/ball.fbx");
 
-    physicsEngine = new PhysicsEngine(&players, &walls, ball, &mtx_ball);
+    physicsEngine = new PhysicsEngine(&players, &walls, ball, spellBox, &mtx_ball);
 
     // Activer le test de profondeur
     glEnable(GL_DEPTH_TEST);
@@ -724,6 +766,21 @@ int main()
             delete it->second;
             it->second = nullptr;
         }
+    }
+
+    for (auto it = shaders.begin(); it != shaders.end(); ++it)
+    {
+        if (it->second)
+        {
+            delete it->second;
+            it->second = nullptr;
+        }
+    }
+
+    if (spellBox)
+    {
+        delete spellBox;
+        spellBox = nullptr;
     }
 
     if (window)

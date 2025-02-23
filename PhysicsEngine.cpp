@@ -1,10 +1,11 @@
 #include "PhysicsEngine.h"
 
-PhysicsEngine::PhysicsEngine(std::vector<Player*>* players, std::vector<Element>* walls, Ball* ball, std::mutex* mtx_ball)
+PhysicsEngine::PhysicsEngine(std::vector<Player*>* players, std::vector<Element>* walls, Ball* ball, SpellBox* spellBox, std::mutex* mtx_ball)
 {
     this->players   = players;
     this->walls     = walls;
     this->ball      = ball;
+    this->spellBox  = spellBox;
     this->mtx_ball  = mtx_ball;
 }
 
@@ -116,6 +117,7 @@ void PhysicsEngine::run(GLfloat& deltaTime)
         return;
     }
 
+    //test avec la paddle
     distance = distanceBetweenHitboxes(ball, element);
 
     //std::cout << distance << std::endl;
@@ -161,6 +163,7 @@ void PhysicsEngine::run(GLfloat& deltaTime)
             ball->setVelocityZ(-ball->getVelocityZ());
         }
 
+
         ball->setLastElementHit(element);
 
         //while (distanceBetweenHitboxes(ball, element) == 0)
@@ -175,7 +178,7 @@ void PhysicsEngine::runWarmup(GLfloat& deltaTime)
 {
     float distance;
     Element* element = nullptr;
-    short isPaddle = true;//pour vérifier le type d'Element, plus rapide qu'un dynamic cast ?
+    short isPaddle = false, isWall = false, isSpellbox = false;;//pour vérifier le type d'Element, plus rapide qu'un dynamic cast ?
 
     Player* p1 = ((*players)[0]->getSide() == -1) ? (*players)[0] : (*players)[1], * p2 = ((*players)[1]->getSide() == 1) ? (*players)[1] : (*players)[0];
 
@@ -225,11 +228,12 @@ void PhysicsEngine::runWarmup(GLfloat& deltaTime)
     }
 
     distance = distanceBetweenHitboxes(ball, element);
+    if (distance == 0) isPaddle = true;
 
     //std::cout << distance << std::endl;
 
     //Si la distance avec le joueur est > 0, alors on vérifie la distance avec les murs
-    if (distance > 0)
+    else if (distance > 0)
     {
         for (Element& wall : *walls)
         {
@@ -238,8 +242,19 @@ void PhysicsEngine::runWarmup(GLfloat& deltaTime)
             if (distance == 0)//Si distance avec le mur == 0, on sort
             {
                 element = &wall;
-                isPaddle = false;//passe à un si on est au contact d'un wall, sinon reste à 0
+                isWall = true;//passe à un si on est au contact d'un wall, sinon reste à 0
                 break;
+            }
+        }
+
+        if (distance > 0)//si distance > 0 alors on a pas hit un wall, on check la spellbox
+        {
+            distance = distanceBetweenHitboxes(spellBox, ball);
+
+            if (distance == 0)
+            {
+                element = spellBox;
+                isSpellbox = true;
             }
         }
     }
@@ -264,9 +279,13 @@ void PhysicsEngine::runWarmup(GLfloat& deltaTime)
 
             ball->setVelocityZ(velocityZ);
         }
-        else
+        else if(isWall)
         {
             ball->setVelocityZ(-ball->getVelocityZ());
+        }
+        else if (isSpellbox)
+        {
+            std::cout << "SPELLBOX HIT!!" << std::endl;
         }
 
         ball->setLastElementHit(element);

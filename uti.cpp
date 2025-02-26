@@ -29,9 +29,9 @@ uint64_t getCurrentTimestamp()
 	return static_cast<uint64_t>(std::time(nullptr));
 }
 
-uint64_t getCurrentTimestampMilliseconds()
+long long getCurrentTimestampMs()
 {
-	auto now = std::chrono::steady_clock::now();  // Utilise le clock steady pour plus de précision
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());  // Convertit en millisecondes
-	return duration.count();  // Retourne le timestamp en millisecondes
+	auto now = std::chrono::system_clock::now();
+	auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+	return now_ms.time_since_epoch().count();
 }

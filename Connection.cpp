@@ -62,23 +62,6 @@ Connection::~Connection()
     WSACleanup();
 }
 
-//void Connection::sendNEUDP(NetworkEntity& ne)
-//{
-//    ne.id = htons(ne.id);
-//    ne.xMap = htonl(ne.xMap);
-//    ne.yMap = htonl(ne.yMap);
-//
-//    // Envoi des données sérialisées
-//    int bytesSent = sendto(udpSocket, (const char*)&ne, sizeof(ne), 0, (sockaddr*)&udpServerAddr, sizeof(udpServerAddr));
-//    if (bytesSent == SOCKET_ERROR) {
-//        std::cerr << "Erreur lors de l'envoi des donnees -> " << WSAGetLastError() << std::endl;
-//    }
-//    else if (bytesSent != sizeof(ne)) 
-//    {
-//        std::cerr << "Erreur : seuls " << bytesSent << " octets sur " << sizeof(ne) << " ont ete envoyes." << std::endl;
-//    }
-//}
-
 short Connection::recvTCP(NetworkBall& nball, NetworkPaddleStart& nps, GLboolean& run)
 {
     int bytesReceived = 0;
@@ -92,7 +75,8 @@ short Connection::recvTCP(NetworkBall& nball, NetworkPaddleStart& nps, GLboolean
     {
         //std::cout << "Reception du header..." << std::endl;
         bytesReceived = recv(tcpSocket, ((char*)&header) + totalReceived, sizeof(header) - totalReceived, 0);
-        if (bytesReceived <= 0) {
+        if (bytesReceived <= 0) 
+        {
             int wsaError = WSAGetLastError();
             if (wsaError == 10035)
             { // socket en mode non bloquant n'a rien reçu
@@ -259,7 +243,8 @@ bool Connection::recvVersionTCP(NetworkVersion& nv)
         std::memcpy(&nv, buffer, dataSize);
 
         // Convertir les champs en endian correct si nécessaire
-        nv.version = ntohl(nv.version);
+        nv.version      = ntohl(nv.version);
+        nv.start_time   = ntohl(nv.start_time);
 
         std::cout << "Version received: " << nv.version << std::endl;
     }
@@ -414,6 +399,7 @@ short Connection::recvUDP(NetworkPaddle& np, NetworkBall& nb)
             nb.velocityZ    = ntohl(nb.velocityZ);
             nb.speed        = ntohs(nb.speed);
             nb.timestamp    = ntohl(nb.timestamp);
+            //std::cout << "Timestamp received: " << nb.timestamp << std::endl;
             //std::cout << "[UDP] Ball reçue: x=" << (float)(nb.x / 1000.0f) << ", z=" << (float)(nb.z / 1000.0f) << " velocityX: " << (float)(nb.velocityX / 1000.0f) << " velocityZ: " << (float)(nb.velocityZ / 1000.0f) << " -> " << nb.timestamp << std::endl;
             return Header::BALL;
         }

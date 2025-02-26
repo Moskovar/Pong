@@ -17,6 +17,7 @@ class Ball : public Element
 		void setVelocityZ(GLfloat velocityZ) { this->velocityZ = velocityZ; }
 		void setLastElementHit(Element* e);
 
+		void updateInterpolateFactors(NetworkBall& nb);
 		void move(GLfloat deltaTime);
 		void turnBack();
 		void reset();
@@ -26,7 +27,7 @@ class Ball : public Element
 
 	private:
 		short direction = 1.0f;//1 ou - 1 pour donner la direction
-		GLfloat velocityX = 0.0f, velocityZ = 0.0f;
+		GLfloat velocityX = 0.0f, velocityZ = 0.0f, interpolateFactorX = 1.0f, interpolateFactorZ = 1.0f, lastVelocityX = 0.0f, lastVelocityZ = 0.0f;
 
 		Element* lastElementHit = nullptr;
 

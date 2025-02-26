@@ -16,11 +16,13 @@
 #include "Ball.h"
 #include "SpellBox.h"
 
+#include <deque>
+
 GLfloat width = 1920.0f, height = 1080.0f;
 
 Connection co;
 
-std::mutex mtx, mtx_ball, mtx_players;
+std::mutex mtx, mtx_ball, mtx_players, mtx_time_buffer;
 
 Window*         window          = nullptr;
 Camera*         camera          = nullptr;
@@ -38,6 +40,10 @@ std::vector<Player*> players;
 std::vector<NetworkPaddleStart> nps_players;//pour récupérer les données relatives aux joueurs dans un thread secondaire, en dehors du contexte openGL
 std::vector<Element> walls;
 SpellBox* spellBox = nullptr;
+
+std::deque<NetworkBall> time_buffer;
+uint32_t server_start_time, last_ball_update_time;
+
 
 std::thread* t_receive_data_tcp = nullptr;
 
@@ -271,6 +277,23 @@ bool findRayIntersectionWithMap(const glm::vec3& rayOrigin, const glm::vec3& ray
     return true;
 }
 
+uint32_t getElapsedTimeMs()
+{
+    // Obtenir le temps actuel en millisecondes depuis l'époque UNIX
+    uint32_t current_time = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+
+    // Calculer le temps écoulé depuis start_time
+    if (current_time >= server_start_time)
+    {
+        return current_time - server_start_time;
+    }
+    else
+    {
+        // Si current_time est inférieur à start_time (cas improbable mais possible si il y a un dépassement -> 46j et quelques)
+        return 0;
+    }
+}
+
 void receive_data_udp()
 {
     NetworkPaddle np;
@@ -287,12 +310,15 @@ void receive_data_udp()
             //case Header::BALL: ball->update(nb);        break;
             case Header::BALL: 
                 //std::cout << "Ball          -> " << ball->getX() << " : " << ball->getZ() << std::endl;
-                mtx_ball.lock();
-                ball->updateInterpolate(nb);
-                mtx_ball.unlock();
+                //mtx_ball.lock();
+                std::lock_guard<std::mutex> lock(mtx_time_buffer);
+                time_buffer.push_back(nb);
+
+                ////ball->updateInterpolate(nb);
+                //ball->update(nb);
+                //mtx_ball.unlock();
                 //std::cout << "Ball received -> " << (float)(nb.x / 1000.0f) << " : " << (float)(nb.z / 1000.0f) << std::endl;
                 break;
-                
         }
 
         //std::cout << "Coucou thread" << std::endl;
@@ -570,6 +596,8 @@ void run_game()
     float   currentFrame = 0, animationTime = 0, timeSinceStart = 0,
             lastFrame = glfwGetTime(), deltaTime = 0;
 
+    long long lastTimePaddlePosSent = 0;
+
     //dynamic_cast<LaserShader*>(shaders["AnimatedObjectLaser"])->timeValue = &now;
 
     GLFWwindow* glfwWindow = window->getGLFWWindow();
@@ -609,11 +637,12 @@ void run_game()
 
             GLfloat z = players[0]->getPaddle()->getPosition().z;
             players[0]->getPaddle()->setPositionZ(worldPos.z);
-            if (players[0]->getPaddle()->getPosition().z != z)//si le paddle a changé de position
+            long long nowMs = getCurrentTimestampMs();
+            if (players[0]->getPaddle()->getPosition().z != z/*std::abs(players[0]->getPaddle()->getPosition().z - z) > 0.01 && (nowMs - lastTimePaddlePosSent >= 17)*/)//si le paddle a changé de position
             {
-                //std::cout << "pos changed, send udp..." << std::endl;
+                lastTimePaddlePosSent = nowMs;
+
                 NetworkPaddle np = players[0]->getNP();
-                //std::cout << players[0]->getPaddle()->getPosition().z << " : " << np.z << std::endl;
                 co.sendNPUDP(np);
             }
         }
@@ -625,6 +654,22 @@ void run_game()
         //std::cout << minp.x << " : " << minp.y << " : " << minp.z << std::endl;
         //std::cout << maxp2.x << " : " << maxp2.y << " : " << maxp2.z << std::endl;
         //std::cout << minp2.x << " : " << minp2.y << " : " << minp2.z << std::endl;
+
+        //Maj de la position de la balle
+        uint32_t elapsedTime = getElapsedTimeMs();
+        if(elapsedTime - last_ball_update_time >= 20)
+        {
+            std::lock_guard<std::mutex> lock(mtx_time_buffer);
+            if (!time_buffer.empty())
+            {
+                //ball->updateInterpolateFactors(time_buffer.front());
+                //ball->updateInterpolate(time_buffer.front());
+                ball->update(time_buffer.front());
+                time_buffer.pop_front();
+                last_ball_update_time = elapsedTime;
+            }
+        }
+        //if(time_buffer.size() == 0) std::cout << time_buffer.size() << std::endl;
 
         // Effacer le buffer de couleur et de profondeur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -643,8 +688,10 @@ void run_game()
 
         //play.render(shaders["AnimatedObject"].modelLoc, shaders["AnimatedObject"].bonesTransformsLoc);
 
-        physicsEngine->run(deltaTime);
-        //ball->move(deltaTime);
+        //physicsEngine->run(deltaTime);
+        //mtx_ball.lock();
+        ball->move(deltaTime);
+        //mtx_ball.unlock();
 
         //--- Reset des mouvements souris dans la fenêtre pour traiter les prochains ---//
         window->resetXYChange();
@@ -671,6 +718,9 @@ int main()
     co.recvVersionTCP(nv);
 
     if (nv.version != 1010) return 0;
+
+    server_start_time       = nv.start_time;
+    last_ball_update_time   = server_start_time;
 
     //--- Chargement du contexte OpenGL ---//
     window = new Window(width, height);

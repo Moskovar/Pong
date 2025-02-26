@@ -17,6 +17,8 @@ Shader::Shader(std::string vertexSrc, std::string fragmentSrc, glm::mat4* view, 
     projLoc             = glGetUniformLocation(shaderProgram, "projection");
     bonesTransformsLoc  = glGetUniformLocation(shaderProgram, "bonesTransform");
 
+    std::cout << "ModelLoc: " << modelLoc << std::endl;
+
     std::cout << vertexSrc << " : " << modelLoc << " ... " << viewLoc << " ... " << projLoc << std::endl;
 }
 

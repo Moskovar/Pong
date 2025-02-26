@@ -133,6 +133,7 @@ struct NetworkVersion
 {
 	short header = Header::VERSION;
 	int version = 0;
+	uint32_t start_time;
 };
 #pragma pack(pop)
 
@@ -188,4 +189,4 @@ struct NetworkSpell
 
 uint64_t getCurrentTimestamp();
 
-uint64_t getCurrentTimestampMilliseconds();
+long long getCurrentTimestampMs();
